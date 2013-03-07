@@ -1,0 +1,9 @@
+[ConnectionManager]
+Name = whosthere
+BusName = org.freedesktop.Telepathy.ConnectionManager.whosthere
+ObjectPath = /org/freedesktop/Telepathy/ConnectionManager/whosthere
+
+[Protocol whatsapp]
+param-phonenumber = s required
+param-password = s required
+param-uid = s

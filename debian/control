@@ -1,0 +1,18 @@
+Source: telepathy-whosthere
+Section: unknown
+Priority: extra
+Maintainer: Matthias Gehre <M.Gehre@gmx.de>
+Build-Depends: debhelper (>= 8.0.0), cmake, python,
+               libboost-python-dev,
+               libtelepathy-qt5-dev (>= 0.9.3.4),
+               libtelepathy-qt5-0 (>= 0.9.3.4),
+               qt5-default (>= 5.0),
+               qtbase5-dev (>= 5.0),
+Standards-Version: 3.9.3
+Homepage: https://github.com/mgehre/telepathy-whosthere
+
+Package: telepathy-whosthere
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: A telepathy connection manager for WhatsApp
+ telepathy-whosthere is a telepathy connection manager for WhatsApp

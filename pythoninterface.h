@@ -1,0 +1,104 @@
+/*
+ * Copyright (C) 2013 Matthias Gehre <gehre.matthias@gmail.com>
+ *
+ * This work is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public
+ * License as published by the Free Software Foundation; either
+ * version 2 of the License, or (at your option) any later version.
+ *
+ * This work is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public
+ * License along with this work; if not, write to the Free Software
+ * Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ */
+
+#ifndef PYTHONINTERFACE_H
+#define PYTHONINTERFACE_H
+
+#include <thread>
+#include <QObject>
+#include <QString>
+#include <boost/python.hpp>
+
+
+#ifndef PyObject_HEAD
+struct _object;
+typedef _object PyObject;
+#endif
+
+class YowsupInterface : public QObject {
+    Q_OBJECT
+public:
+    YowsupInterface(QObject *parent);
+signals:
+    void auth_success(QString mobilenumber);
+    void auth_fail(QString mobilenumber, QString reason);
+    void status_dirty();
+    void message_received(QString msgId, QString jid, QString content, uint timestamp, bool wantsReceipt, QString pushName);
+    void disconnected(QString reason);
+    void receipt_messageSent(QString jid,QString msgId);
+    void receipt_messageDelivered(QString jid, QString msgId);
+    void presence_updated(QString jid, QString lastSeen);
+    void presence_available(QString jid);
+    void presence_unavailable(QString jid);
+    void group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt);
+    void group_gotInfo(QString jid,QString owner,QString subject,QString subjectOwner,QString subjectT,QString creation);
+    void group_setSubjectSuccess(QString jid);
+    void group_subjectReceived(QString msgId,QString fromAttribute,QString author,QString newSubject,uint timestamp,bool receiptRequested);
+    void group_addParticipantsSuccess(QString jid);
+    void group_removeParticipantsSuccess(QString jid);
+    void group_createSuccess(QString jid,QString group_id);
+    void group_createFail(QString errorCode);
+    void group_endSuccess(QString jid);
+    void group_gotPicture(QString jid, QString filepath);
+    void group_infoError(QString errorCode);
+    void group_gotParticipants(QString jid, QString jids);
+    void group_setPictureSuccess(QString jid);
+    void group_setPictureError(QString jid, QString errorCode);
+    void profile_setStatusSuccess(QString jid, QString msgId);
+    void profile_setPictureSuccess();
+    void profile_setPictureError(QString errorCode);
+    void receipt_visible(QString jid, QString msgId);
+    void contact_gotProfilePictureId(QString jid, QString pictureId);
+    void contact_typing(QString jid);
+    void contact_paused(QString jid);
+    void contact_gotProfilePicture(QString jid, QString filename);
+    void notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
+    void notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt);
+    void notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt);
+    void notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId,bool wantsReceipt);
+    void image_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void video_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void audio_received(QString msgId,QString jid,QString url,QString size,bool wantsReceipt);
+    void location_received(QString msgId,QString jid,QString name,QString preview,double latitude,double longitude,bool wantsReceipt);
+    void vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt);
+    void group_imageReceived(QString msgId,QString jid,QString author,QString preview,QString url,uint size,bool wantsReceipt);
+    void group_videoReceived(QString msgId,QString jid,QString author,QString preview,QString url,uint size,bool wantsReceipt);
+    void group_audioReceived(QString msgId,QString jid,QString author,QString url, uint size, bool wantsReceipt);
+    void group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,double latitude, double longitude, bool wantsReceipt);
+    void group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
+    void message_error(QString msgId,QString jid,QString errorCode);
+    void ping(QString pingId);
+    void pong();
+};
+
+class PythonInterface
+{
+public:
+    PythonInterface(YowsupInterface* handler);
+    ~PythonInterface();
+    template<typename... T>
+    boost::python::object call(const QString& method, const T&... args);
+    void runReaderThread();
+private:
+    boost::python::object pModule;
+    boost::python::object pConnectionManager;
+    PyThreadState* tstate;
+    std::thread readerThread;
+};
+
+#endif // PYTHONINTERFACE_H

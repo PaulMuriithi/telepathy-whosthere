@@ -1,0 +1,3 @@
+[D-BUS Service]
+Name=org.freedesktop.Telepathy.ConnectionManager.whosthere
+Exec=@CMAKE_INSTALL_PREFIX@/@LIBEXEC_DIR@/telepathy-whosthere

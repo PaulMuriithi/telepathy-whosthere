@@ -1,0 +1,5 @@
+Howto setup the telepathy account:
+
+mc-tool add whosthere/whatsapp "WhatsappAccount" string:phonenumber=[phonenumber incl. country code without leading+ or 00] string:password=[base64 encode]
+mc-tool enable whosthere/whatsapp/account0
+mc-tool auto-connect whosthere/whatsapp/account0 on
