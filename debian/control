@@ -1,5 +1,5 @@
 Source: telepathy-whosthere
-Section: unknown
+Section: net
 Priority: extra
 Maintainer: Matthias Gehre <M.Gehre@gmx.de>
 Build-Depends: debhelper (>= 8.0.0), cmake, python,
