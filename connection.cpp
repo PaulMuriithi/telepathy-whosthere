@@ -429,21 +429,6 @@ void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId
 
 bool YSConnection::isValidId(const QString& jid) {
     return QRegExp(R"(^\d+@s\.whatsapp\.net$)").exactMatch(jid);
-
-    if(!jid.endsWith("@s.whatsapp.net")) {
-        qDebug() << "Id has wrong suffix " << jid;
-        return false;
-    }
-    QString number = jid.left(jid.length()-QLatin1String("@s.whatsapp.net").size());
-    if(number.length() == 0)
-        return false;
-    bool isInt;
-    number.toInt(&isInt);
-    if(!isInt) {
-        qDebug() << "Id non-numeric prefix " << jid;
-        return false;
-    }
-    return true;
 }
 
 uint YSConnection::ensureContact(QString jid) {
