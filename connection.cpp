@@ -303,9 +303,8 @@ uint YSConnection::setPresence(const QString& status, const QString& message, Tp
 /*                                             YowsupInterface                                      */
 void YSConnection::on_yowsup_auth_success(QString phonenumber) {
     qDebug() << "YSConnection::auth_success " << phonenumber;
-    qDebug() << "Thread id auth_success " << QThread::currentThreadId();
 
-    //FIXME: this crashe in libdbus
+    //FIXME: this crashes in libdbus
     //simplePresenceIface->setStatuses(Protocol::getSimpleStatusSpecMap());
     simplePresenceIface->setMaxmimumStatusMessageLength(20); //FIXME
 
@@ -323,6 +322,7 @@ void YSConnection::on_yowsup_auth_success(QString phonenumber) {
 
     /* Set ContactList status */
     contactListIface->setContactListState(ContactListStateSuccess);
+
     pythonInterface->runReaderThread();
 }
 
