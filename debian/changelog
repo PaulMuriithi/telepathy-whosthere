@@ -1,3 +1,9 @@
+telepathy-whosthere (0.3) quantal; urgency=low
+
+  * More contact list, presence, fixes
+
+ -- Matthias Gehre <M.Gehre@gmx.de>  Sat, 09 Mar 2013 00:55:15 -0600
+
 telepathy-whosthere (0.2) quantal; urgency=low
 
   * Added depedency on yowsup
