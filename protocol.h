@@ -29,6 +29,7 @@ public:
     Protocol(const QDBusConnection &dbusConnection, const QString &name);
     virtual ~Protocol();
 
+    static Tp::SimpleStatusSpecMap getSimpleStatusSpecMap();
 private:
     Tp::BaseConnectionPtr createConnection(const QVariantMap &parameters, Tp::DBusError *error);
     QString identifyAccount(const QVariantMap &parameters, Tp::DBusError *error);

@@ -30,6 +30,32 @@
 
 using namespace Tp;
 
+SimpleStatusSpecMap Protocol::getSimpleStatusSpecMap()
+{
+    /*//Presence
+    SimpleStatusSpec spAvailable;
+    spAvailable.type = ConnectionPresenceTypeAvailable;
+    spAvailable.maySetOnSelf = false;
+    spAvailable.canHaveMessage = true;
+
+    SimpleStatusSpec spOffline;
+    spOffline.type = ConnectionPresenceTypeOffline;
+    spOffline.maySetOnSelf = false;
+    spOffline.canHaveMessage = false;
+
+    SimpleStatusSpec spUnknown;
+    spOffline.type = ConnectionPresenceTypeUnknown;
+    spOffline.maySetOnSelf = false;
+    spOffline.canHaveMessage = false;
+
+    SimpleStatusSpecMap specs;
+    specs.insert(QLatin1String("available"), spAvailable);
+    specs.insert(QLatin1String("offline"), spOffline);
+    specs.insert(QLatin1String("unknown"), spUnknown);
+    return specs;*/
+    return SimpleStatusSpecMap();
+}
+
 Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
     : BaseProtocol(dbusConnection, name)
 {
@@ -44,7 +70,7 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
 
     setEnglishName(QLatin1String("WhatsApp"));
     setIconName(QLatin1String("example-icon"));
-    setVCardField(QLatin1String("x-example"));
+    setVCardField(QLatin1String("tel"));
 
     // callbacks
     setCreateConnectionCallback(memFun(this, &Protocol::createConnection));
@@ -53,8 +79,8 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
 
     // Adressing
     addrIface = BaseProtocolAddressingInterface::create();
-    addrIface->setAddressableVCardFields(QStringList() << QLatin1String("x-example-vcard-field"));
-    addrIface->setAddressableUriSchemes(QStringList() << QLatin1String("example-uri-scheme"));
+    addrIface->setAddressableVCardFields(QStringList() << QLatin1String("tel"));
+    addrIface->setAddressableUriSchemes(QStringList() << QLatin1String("tel"));
     addrIface->setNormalizeVCardAddressCallback(memFun(this, &Protocol::normalizeVCardAddress));
     addrIface->setNormalizeContactUriCallback(memFun(this, &Protocol::normalizeContactUri));
     plugInterface(AbstractProtocolInterfacePtr::dynamicCast(addrIface));
@@ -65,24 +91,8 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
                 16, 64, 32, 16, 64, 32, 1024));
     plugInterface(AbstractProtocolInterfacePtr::dynamicCast(avatarsIface));
 
-    //Presence
-    SimpleStatusSpec spAvailable;
-    spAvailable.type = ConnectionPresenceTypeAvailable;
-    spAvailable.maySetOnSelf = true;
-    spAvailable.canHaveMessage = true;
-
-    SimpleStatusSpec spOffline;
-    spOffline.type = ConnectionPresenceTypeOffline;
-    spOffline.maySetOnSelf = true;
-    spOffline.canHaveMessage = false;
-
-    SimpleStatusSpecMap specs;
-    specs.insert(QLatin1String("available"), spAvailable);
-    specs.insert(QLatin1String("offline"), spOffline);
-
-
     presenceIface = BaseProtocolPresenceInterface::create();
-    presenceIface->setStatuses(PresenceSpecList(specs));
+        presenceIface->setStatuses(PresenceSpecList(getSimpleStatusSpecMap()));
     plugInterface(AbstractProtocolInterfacePtr::dynamicCast(presenceIface));
 }
 
@@ -105,14 +115,14 @@ BaseConnectionPtr Protocol::createConnection(const QVariantMap &parameters, Tp::
 
 QString Protocol::identifyAccount(const QVariantMap &parameters, Tp::DBusError *error)
 {
-    qDebug() << "Protocol::identifyAccount";
+    qDebug() << "Protocol::identifyAccount " << parameters;
     error->set(QLatin1String("IdentifyAccount.Error.Test"), QLatin1String(""));
     return QString();
 }
 
 QString Protocol::normalizeContact(const QString &contactId, Tp::DBusError *error)
 {
-    qDebug() << "Protocol::normalizeContact";
+    qDebug() << "Protocol::normalizeContact " << contactId;
     error->set(QLatin1String("NormalizeContact.Error.Test"), QLatin1String(""));
     return QString();
 }
@@ -120,14 +130,14 @@ QString Protocol::normalizeContact(const QString &contactId, Tp::DBusError *erro
 QString Protocol::normalizeVCardAddress(const QString &vcardField, const QString vcardAddress,
         Tp::DBusError *error)
 {
-    qDebug() << "Protocol::normalizeVCardAddress";
+    qDebug() << "Protocol::normalizeVCardAddress " << vcardField;
     error->set(QLatin1String("NormalizeVCardAddress.Error.Test"), QLatin1String(""));
     return QString();
 }
 
 QString Protocol::normalizeContactUri(const QString &uri, Tp::DBusError *error)
 {
-    qDebug() << "Protocol::normalizeContactUri";
+    qDebug() << "Protocol::normalizeContactUri " << uri;
     error->set(QLatin1String("NormalizeContactUri.Error.Test"), QLatin1String(""));
     return QString();
 }

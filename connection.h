@@ -48,6 +48,9 @@ public:
     Tp::UIntList requestHandles(uint handleType, const QStringList& identifiers, Tp::DBusError* error);
     void messageAcknowledged(QString id);
     QString sendMessage(const QString& jid, const Tp::MessagePartList& message, uint flags, Tp::DBusError* error);
+    uint setPresence(const QString& status, const QString& message, Tp::DBusError* error);
+    Tp::ContactAttributesMap getContactListAttributes(const QStringList& interfaces, bool hold, Tp::DBusError* error);
+    void requestSubscription(const Tp::UIntList& contacts, const QString& message, Tp::DBusError* error);
 
 private slots:
     void on_yowsup_auth_success(QString phonenumber);
@@ -58,11 +61,14 @@ private slots:
     void on_yowsup_receipt_messageSent(QString jid,QString msgId);
     void on_yowsup_receipt_messageDelivered(QString jid, QString msgId);
 private:
+    bool isValidId(const QString& jid);
     uint addContact(QString jid);
     uint ensureContact(QString jid);
 
     Tp::BaseConnectionRequestsInterfacePtr requestsIface;
     Tp::BaseConnectionContactsInterfacePtr contactsIface;
+    Tp::BaseConnectionSimplePresenceInterfacePtr simplePresenceIface;
+    Tp::BaseConnectionContactListInterfacePtr contactListIface;
     /* handle "0" is never valid accordin to spec */
     boost::bimap<uint,QString> contacts;
 
@@ -70,6 +76,7 @@ private:
     QHash<QString,std::tuple<QString,QString,bool>> pendingMessages;
     /* increasing id for unique telepathy-ids */
     uint lastMessageId;
+    uint selfHandle;
 
     PythonInterface* pythonInterface;
 
