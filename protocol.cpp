@@ -32,7 +32,7 @@ using namespace Tp;
 
 SimpleStatusSpecMap Protocol::getSimpleStatusSpecMap()
 {
-    /*//Presence
+    //Presence
     SimpleStatusSpec spAvailable;
     spAvailable.type = ConnectionPresenceTypeAvailable;
     spAvailable.maySetOnSelf = false;
@@ -44,16 +44,15 @@ SimpleStatusSpecMap Protocol::getSimpleStatusSpecMap()
     spOffline.canHaveMessage = false;
 
     SimpleStatusSpec spUnknown;
-    spOffline.type = ConnectionPresenceTypeUnknown;
-    spOffline.maySetOnSelf = false;
-    spOffline.canHaveMessage = false;
+    spUnknown.type = ConnectionPresenceTypeUnknown;
+    spUnknown.maySetOnSelf = false;
+    spUnknown.canHaveMessage = false;
 
     SimpleStatusSpecMap specs;
     specs.insert(QLatin1String("available"), spAvailable);
     specs.insert(QLatin1String("offline"), spOffline);
     specs.insert(QLatin1String("unknown"), spUnknown);
-    return specs;*/
-    return SimpleStatusSpecMap();
+    return specs;
 }
 
 Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
@@ -71,6 +70,7 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
     setEnglishName(QLatin1String("WhatsApp"));
     setIconName(QLatin1String("example-icon"));
     setVCardField(QLatin1String("tel"));
+    //FIXME: setConnectionInterfaces(...);
 
     // callbacks
     setCreateConnectionCallback(memFun(this, &Protocol::createConnection));
@@ -100,17 +100,9 @@ Protocol::~Protocol()
 {
 }
 
-static BaseConnectionPtr connection;
-BaseConnectionPtr Protocol::createConnection(const QVariantMap &parameters, Tp::DBusError *error)
-{
-    qDebug() << "Protocol::createConnection " << name();
-    if(connection.isNull()) {
-        connection = BaseConnection::create<YSConnection>( "whosthere", name().toLatin1(), parameters);
-        return connection;
-    } else {
-        error->set(QLatin1String("NormalizeVCardAddress.Error.Test"), QLatin1String("Only one connection allowed"));
-        return BaseConnectionPtr();
-    }
+BaseConnectionPtr Protocol::createConnection(const QVariantMap &parameters, Tp::DBusError *error) {
+
+    return BaseConnection::create<YSConnection>( "whosthere", name().toLatin1(), parameters);
 }
 
 QString Protocol::identifyAccount(const QVariantMap &parameters, Tp::DBusError *error)

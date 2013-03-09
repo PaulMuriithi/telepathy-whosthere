@@ -93,12 +93,23 @@ public:
     ~PythonInterface();
     template<typename... T>
     boost::python::object call(const QString& method, const T&... args);
+    template<typename... T>
+    boost::python::object call_intern(const char* method, const T&... args);
     void runReaderThread();
 private:
     boost::python::object pModule;
     boost::python::object pConnectionManager;
     PyThreadState* tstate;
     std::thread readerThread;
+};
+
+class GILStateHolder
+{
+public:
+    GILStateHolder();
+    ~GILStateHolder();
+private:
+    PyGILState_STATE gstate;
 };
 
 #endif // PYTHONINTERFACE_H

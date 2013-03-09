@@ -19,6 +19,23 @@
 const char* YowsupInterfacePy =
 R"(
 from Yowsup.connectionmanager import YowsupConnectionManager
+from Yowsup.Contacts.contacts import WAContactsSyncRequest
+from Yowsup.Common.debugger import Debugger
+import signal
+#Don't swallow SIGINT
+signal.signal(signal.SIGINT, signal.SIG_DFL)
+Debugger.enabled = True
+
+def resultToString(result):
+    out = []
+    for k, v in result.items():
+        if v is None:
+            continue
+        if type(v) is str:
+            v = v.encode('utf-8')
+        out.append("%s: %s" %(k, v))
+
+    return "\n".join(out)
 
 def createCallback(handler, sig):
     return lambda *args: getattr(handler,sig)(*args)
@@ -43,4 +60,12 @@ def runThread(connectionManager):
     print 'In runThread'
     connectionManager.startReader()
     connectionManager.readerThread.join()
+
+def syncContact(login, password, contact):
+    wsync = WAContactsSyncRequest(login, password, (contact,))
+    result = wsync.send()
+    print resultToString(result)
+    ret = result[u'c'][0][u'w']
+    print "Returning ", ret
+    return ret
 )";

@@ -24,6 +24,7 @@
 
 using namespace Tp;
 using namespace std;
+namespace python = boost::python;
 
 YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
                             const QString &  	cmName,
@@ -72,6 +73,12 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     contactListIface->setRequestSubscriptionCallback(Tp::memFun(this,&YSConnection::requestSubscription));
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(contactListIface));
 
+
+    addressingIface = BaseConnectionAddressingInterface::create();
+    addressingIface->setGetContactsByVCardFieldCallback( Tp::memFun(this,&YSConnection::getContactsByVCardField) );
+    addressingIface->setGetContactsByURICallback( Tp::memFun(this,&YSConnection::getContactsByURI) );
+    plugInterface(AbstractConnectionInterfacePtr::dynamicCast(addressingIface));
+
     pythonInterface = new PythonInterface(&yowsupInterface);
     yowsupInterface.setObjectName("yowsup");
     QMetaObject::connectSlotsByName(this);
@@ -86,10 +93,18 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     qDebug() << "Thread id constructor " << QThread::currentThreadId();
 }
 
+YSConnection::~YSConnection() {
+    delete pythonInterface;
+}
+
+QString YSConnection::uniqueName() const {
+    //May not start with a digit
+    return "u" + mPhoneNumber;
+}
+
 uint YSConnection::getSelfHandle(Tp::DBusError *error)
 {
-    qDebug() << "getSelfHandle";
-    return 1;
+    return selfHandle;
 }
 
 void YSConnection::connect(Tp::DBusError *error) {
@@ -143,6 +158,10 @@ Tp::ContactAttributesMap YSConnection::getContactAttributes(const Tp::UIntList& 
         QVariantMap attributes;
         //org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i->second;
+        if(handle != selfHandle) {
+            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = SubscriptionStateNo;
+            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateNo;
+        }
         ret[handle] = attributes;
     }
     qDebug() << "YSConnection::getContactAttributes " << handles
@@ -152,14 +171,18 @@ Tp::ContactAttributesMap YSConnection::getContactAttributes(const Tp::UIntList& 
 }
 
 Tp::ContactAttributesMap YSConnection::getContactListAttributes(const QStringList& interfaces,
-                                                                        bool /*hold*/, Tp::DBusError* error)
+                                                                bool /*hold*/, Tp::DBusError* /*error*/)
 {
     Tp::ContactAttributesMap contactAttributeMap;
     for( auto i : contacts.left )
     {
+        if(i.first == selfHandle)
+            continue;
         QVariantMap attributes;
         //org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i.second;
+        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = SubscriptionStateNo;
+        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateNo;
         contactAttributeMap[i.first] = attributes;
     }
     qDebug() << "YSConnection::getContactListAttributesCallback " << interfaces
@@ -171,6 +194,15 @@ void YSConnection::requestSubscription(const Tp::UIntList& contacts,
                                        const QString& message, Tp::DBusError* error)
 {
     qDebug() << "YSConnection::requestSubscription " << contacts;
+    for( uint handle : contacts ) {
+        QString jid = getContactByHandle(handle);
+        if(jid.length() == 0) {
+            error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
+            return;
+        }
+        pythonInterface->call("presence_subscribe", jid);
+        setSubscriptionState(jid, handle, SubscriptionStateYes);
+    }
 }
 
 Tp::UIntList YSConnection::requestHandles(uint handleType, const QStringList& identifiers, Tp::DBusError* error)
@@ -180,7 +212,7 @@ Tp::UIntList YSConnection::requestHandles(uint handleType, const QStringList& id
         for( const QString& identifier : identifiers ) {
             auto i = contacts.right.find(identifier);
             if( i == contacts.right.end()) {
-                if(isValidId(identifier)) {
+                if(isValidContact(identifier)) {
                     ret.push_back(addContact(identifier));
                 } else {
                     qDebug() << "YSConnection::requestHandles: id invalid " << identifier;
@@ -282,8 +314,9 @@ QString YSConnection::sendMessage(const QString& jid, const Tp::MessagePartList&
             break;
         }
 
-    boost::python::object pMsgId = pythonInterface->call("message_send", jid, content);
-    boost::python::extract<QString> get_msgId(pMsgId);
+    GILStateHolder gstate;
+    python::object pMsgId = pythonInterface->call("message_send", jid, content);
+    python::extract<QString> get_msgId(pMsgId);
     if(!get_msgId.check()) {
         qDebug() << "message_send did not return a string";
         error->set(TP_QT_ERROR_INVALID_ARGUMENT,"Internal error");
@@ -300,12 +333,25 @@ uint YSConnection::setPresence(const QString& status, const QString& message, Tp
     return selfHandle;
 }
 
+void YSConnection::getContactsByVCardField(const QString& field, const QStringList& addresses,const QStringList& interfaces,
+                             Tp::AddressingNormalizationMap& addressingNormalizationMap,
+                             Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error) {
+    qDebug() << "YSConnection::getContactsByVCardField " << field << " " << addresses;
+
+}
+
+void YSConnection::getContactsByURI(const QStringList& URIs, const QStringList& interfaces,
+                     Tp::AddressingNormalizationMap& addressingNormalizationMap,
+                     Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error) {
+    qDebug() << "YSConnection::getContactsByURI " << URIs;
+}
+
 /*                                             YowsupInterface                                      */
 void YSConnection::on_yowsup_auth_success(QString phonenumber) {
     qDebug() << "YSConnection::auth_success " << phonenumber;
 
     //FIXME: this crashes in libdbus
-    //simplePresenceIface->setStatuses(Protocol::getSimpleStatusSpecMap());
+    simplePresenceIface->setStatuses(Protocol::getSimpleStatusSpecMap());
     simplePresenceIface->setMaxmimumStatusMessageLength(20); //FIXME
 
     /* Set presence */
@@ -324,6 +370,7 @@ void YSConnection::on_yowsup_auth_success(QString phonenumber) {
     contactListIface->setContactListState(ContactListStateSuccess);
 
     pythonInterface->runReaderThread();
+    pythonInterface->call("presence_sendAvailable");
 }
 
 void YSConnection::on_yowsup_auth_fail(QString mobilenumber, QString reason) {
@@ -376,7 +423,10 @@ void YSConnection::on_yowsup_message_received(QString msgId, QString jid, QStrin
 
 void YSConnection::on_yowsup_disconnected(QString reason) {
     qDebug() << "YSConnection::on_yowsup_disconnected: reason=" << reason;
-    setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonNetworkError);
+    if(reason == "shutdown") //set in PythonInterface::~PythonInterface()
+        setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonRequested);
+    else
+        setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonNetworkError);
 }
 
 void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
@@ -425,16 +475,63 @@ void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId
     messagesIface->messageReceived(partList);
 }
 
+void YSConnection::on_yowsup_presence_available(QString jid) {
+    uint handle = ensureContact(jid);
+    if(!handle) {
+        qDebug() << "YSConnection::on_yowsup_presence_available: could not create contact " << jid;
+        return;
+    }
+    setPresenceState(handle, "available");
+    if(handle != selfHandle)
+        setSubscriptionState(jid, handle, SubscriptionStateYes);
+}
+
+void YSConnection::on_yowsup_presence_unavailable(QString jid) {
+    uint handle = ensureContact(jid);
+    if(!handle) {
+        qDebug() << "YSConnection::on_yowsup_presence_unavailable: could not create contact " << jid;
+        return;
+    }
+    setPresenceState(handle, "offline");
+    if(handle != selfHandle)
+        setSubscriptionState(jid, handle, SubscriptionStateYes);
+}
+
 /* Convenience */
+bool YSConnection::isValidContact(const QString& identifier) {
+    if(!isValidId(identifier))
+        return false;
+
+    GILStateHolder gstate;
+    QString number = "+" + identifier.left(identifier.length()-QLatin1String("@s.whatsapp.net").size());
+    python::object ret = pythonInterface->call_intern("syncContact", mPhoneNumber, mPassword, number);
+    python::extract<int> getInt(ret);
+    if(!getInt.check()) {
+        qDebug() << "YSConnection::isValidContact: return value is a not a int";
+        return false;
+    }
+    bool isValid = getInt();
+    qDebug() << "YSConnection::isValidContact: " << isValid;
+    return isValid;
+}
 
 bool YSConnection::isValidId(const QString& jid) {
-    return QRegExp(R"(^\d+@s\.whatsapp\.net$)").exactMatch(jid);
+    static QRegExp validId(R"(^\d+@s\.whatsapp\.net$)");
+    return validId.exactMatch(jid);
 }
 
 uint YSConnection::ensureContact(QString jid) {
     auto i = contacts.right.find(jid);
     if( i == contacts.right.end() )
         return addContact(jid);
+    else
+        return i->second;
+}
+
+QString YSConnection::getContactByHandle(uint handle) {
+    auto i = contacts.left.find(handle);
+    if( i == contacts.left.end() )
+        return "";
     else
         return i->second;
 }
@@ -448,13 +545,20 @@ uint YSConnection::addContact(QString jid) {
 
     contacts.left.insert( make_pair(handle, jid) );
 
+    setPresenceState(handle, "unknown");
+    if(handle != 1 /*selfHandle is not set yet */)
+        setSubscriptionState(jid, handle, SubscriptionStateUnknown);
+
+    return handle;
+}
+
+void YSConnection::setSubscriptionState(const QString& jid, uint handle, uint state) {
     /* Send ContactList change signal */
-    if(!contactListIface.isNull())
-    {
+    if(!contactListIface.isNull()) {
         Tp::ContactSubscriptions change;
-        change.publish = SubscriptionStateNo;
+        change.publish = SubscriptionStateYes;
         change.publishRequest = "";
-        change.subscribe = SubscriptionStateNo;
+        change.subscribe = state;
         Tp::ContactSubscriptionMap changes;
         changes[handle] = change;
         Tp::HandleIdentifierMap identifiers;
@@ -462,6 +566,22 @@ uint YSConnection::addContact(QString jid) {
         Tp::HandleIdentifierMap removals;
         contactListIface->contactsChangedWithID(changes, identifiers, removals);
     }
+}
 
-    return handle;
+void YSConnection::setPresenceState(uint handle, const QString& status) {
+    if(!simplePresenceIface.isNull()) {
+        SimpleStatusSpecMap statusSpecMap = Protocol::getSimpleStatusSpecMap();
+        auto i = statusSpecMap.find(status);
+        if(i == statusSpecMap.end()) {
+            qDebug() << "YSConnection::setPresenceState: status not found: " << status;
+            return;
+        }
+        SimplePresence presence;
+        presence.status = status;
+        presence.statusMessage = ""; //FIXME
+        presence.type = i->type;
+        SimpleContactPresences presences;
+        presences[handle] = presence;
+        simplePresenceIface->setPresences(presences);
+    }
 }

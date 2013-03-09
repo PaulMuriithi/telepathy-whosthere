@@ -118,14 +118,12 @@ struct QByteArray_to_python_str
       }
 };
 
-#if 0
-BOOST_PYTHON_MODULE(Emb)
-{
-    class_<YowsupInterface>("Emb")
-                                .def("auth_success", &YowsupInterface::auth_success)
-                                ;
+GILStateHolder::GILStateHolder() {
+   gstate = PyGILState_Ensure();
 }
-#endif
+GILStateHolder::~GILStateHolder() {
+    PyGILState_Release(gstate);
+}
 
 PythonInterface::PythonInterface(YowsupInterface* handler)
 {
@@ -216,7 +214,7 @@ PythonInterface::~PythonInterface()
 {
     if(readerThread.joinable()) {
         qDebug() << "PythonInterface::~PythonInterface: sending disconnect, waiting to join";
-        call("disconnect");
+        call("disconnect","shutdown");
         readerThread.join();
         qDebug() << "PythonInterface::~PythonInterface: readerThread joined";
     }
@@ -231,7 +229,7 @@ template object PythonInterface::call<QString,QString>(const QString& method, co
 
 template<typename... T>
 object PythonInterface::call(const QString& method, const T&... args) {
-    auto gstate = PyGILState_Ensure();
+    GILStateHolder gstate;
     object pRet;
     try {
         pRet = pModule.attr("call")(pConnectionManager, object(method), object(args)...);
@@ -240,7 +238,22 @@ object PythonInterface::call(const QString& method, const T&... args) {
         PyErr_Print();
         exit(1);
     }
-    PyGILState_Release(gstate);
+    return pRet;
+}
+
+template object PythonInterface::call_intern<QString,QByteArray,QString>(const char* method, const QString&, const QByteArray&, const QString&);
+
+template<typename... T>
+object PythonInterface::call_intern(const char* method, const T&... args) {
+    GILStateHolder gstate;
+    object pRet;
+    try {
+        pRet = pModule.attr(method)(object(args)...);
+    } catch(const error_already_set& e) {
+        qDebug() << "Python error in call";
+        PyErr_Print();
+        exit(1);
+    }
     return pRet;
 }
 
@@ -254,12 +267,11 @@ void PythonInterface::runReaderThread()
     auto lambda = [this]()
         {
             try {
-                auto state = PyGILState_Ensure();
+                GILStateHolder gstate;
                 /* this will not return until the connection to WhatsApp server
                   * is closed. But it will release the GIL lock during select() calls
                   */
                 pModule.attr("runThread")(pConnectionManager);
-                PyGILState_Release(state);
             } catch(const error_already_set& e) {
                 qDebug() << "Python error in runReaderThread";
                 PyErr_Print();

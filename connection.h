@@ -36,10 +36,12 @@ public:
                     const QString &  	cmName,
                     const QString &  	protocolName,
                     const QVariantMap &  	parameters);
+    ~YSConnection();
     uint getSelfHandle(Tp::DBusError *error) override;
     void connect(Tp::DBusError *error) override;
     bool holdHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error) override;
     QStringList inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error) override;
+    QString uniqueName() const override;
     Tp::BaseChannelPtr createChannel(const QString& channelType, uint targetHandleType,
                                      uint targetHandle, Tp::DBusError *error);
     Tp::ContactAttributesMap getContactAttributes(const Tp::UIntList& handles,
@@ -52,6 +54,14 @@ public:
     Tp::ContactAttributesMap getContactListAttributes(const QStringList& interfaces, bool hold, Tp::DBusError* error);
     void requestSubscription(const Tp::UIntList& contacts, const QString& message, Tp::DBusError* error);
 
+
+    void getContactsByVCardField(const QString& field, const QStringList& addresses,const QStringList& interfaces,
+                                 Tp::AddressingNormalizationMap& addressingNormalizationMap,
+                                 Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error);
+    void getContactsByURI(const QStringList& URIs, const QStringList& interfaces,
+                         Tp::AddressingNormalizationMap& addressingNormalizationMap,
+                         Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error);
+
 private slots:
     void on_yowsup_auth_success(QString phonenumber);
     void on_yowsup_auth_fail(QString mobilenumber, QString reason);
@@ -60,15 +70,22 @@ private slots:
     void on_yowsup_disconnected(QString reason);
     void on_yowsup_receipt_messageSent(QString jid,QString msgId);
     void on_yowsup_receipt_messageDelivered(QString jid, QString msgId);
+    void on_yowsup_presence_available(QString jid);
+    void on_yowsup_presence_unavailable(QString jid);
 private:
+    bool isValidContact(const QString& identifier);
     bool isValidId(const QString& jid);
     uint addContact(QString jid);
     uint ensureContact(QString jid);
+    QString getContactByHandle(uint handle);
+    void setPresenceState(uint handle, const QString& status);
+    void setSubscriptionState(const QString& jid, uint handle, uint state);
 
     Tp::BaseConnectionRequestsInterfacePtr requestsIface;
     Tp::BaseConnectionContactsInterfacePtr contactsIface;
     Tp::BaseConnectionSimplePresenceInterfacePtr simplePresenceIface;
     Tp::BaseConnectionContactListInterfacePtr contactListIface;
+    Tp::BaseConnectionAddressingInterfacePtr addressingIface;
     /* handle "0" is never valid accordin to spec */
     boost::bimap<uint,QString> contacts;
 
