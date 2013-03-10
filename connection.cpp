@@ -62,7 +62,8 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     contactsIface->setGetContactAttributesCallback(Tp::memFun(this,&YSConnection::getContactAttributes));
     contactsIface->setContactAttributeInterfaces(QStringList()
                                                  << QLatin1String("org.freedesktop.Telepathy.Connection")
-                                                 << QLatin1String("org.freedesktop.Telepathy.Connection.Interface.ContactList"));
+                                                 << QLatin1String("org.freedesktop.Telepathy.Connection.Interface.ContactList")
+                                                 << TP_QT_IFACE_CONNECTION_INTERFACE_SIMPLE_PRESENCE);
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(contactsIface));
 
     simplePresenceIface = BaseConnectionSimplePresenceInterface::create();
