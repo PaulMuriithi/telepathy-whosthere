@@ -111,8 +111,7 @@ private:
 
     PythonInterface* pythonInterface;
 
-    QString mUsername;
+    QString mPhoneNumber;
     QByteArray mPassword;
-    QString mUID;
     YowsupInterface yowsupInterface;
 };

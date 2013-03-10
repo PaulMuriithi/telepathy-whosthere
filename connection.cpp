@@ -37,14 +37,11 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     qDebug() << "YSConnection::YSConnection proto: " << protocolName
              << " parameters: " << parameters;
     if(parameters.contains("account"))
-        mUsername = parameters["account"].toString();
+        mPhoneNumber = parameters["account"].toString();
     if(parameters.contains("password"))
         mPassword = QByteArray::fromBase64( parameters["password"].toString().toLatin1() );
-    if(parameters.contains("uid"))
-        mUID = parameters["uid"].toString();
 
-
-    selfHandle = addContact(mUsername + "@s.whatsapp.net");
+    selfHandle = addContact(mPhoneNumber + "@s.whatsapp.net");
     assert(selfHandle == 1);
 
     setCreateChannelCallback( Tp::memFun(this,&YSConnection::createChannel) );
@@ -95,7 +92,7 @@ YSConnection::~YSConnection() {
 
 QString YSConnection::uniqueName() const {
     //May not start with a digit
-    return "u" + mUsername;
+    return "u" + mPhoneNumber;
 }
 
 uint YSConnection::getSelfHandle(Tp::DBusError *error)
@@ -114,7 +111,7 @@ void YSConnection::connect(Tp::DBusError *error) {
 #endif
 
     if(mPassword.length() > 0 ) {
-        pythonInterface->call("auth_login", mUsername, mPassword );
+        pythonInterface->call("auth_login", mPhoneNumber, mPassword );
     } else {
 #ifdef USE_CAPTCHA_FOR_REGISTRATION
         qDebug() << "Opening registration";
@@ -629,7 +626,7 @@ bool YSConnection::isValidContact(const QString& identifier) {
 
     GILStateHolder gstate;
     QString number = "+" + identifier.left(identifier.length()-QLatin1String("@s.whatsapp.net").size());
-    python::object ret = pythonInterface->call_intern("syncContact", mUsername, mPassword, number);
+    python::object ret = pythonInterface->call_intern("syncContact", mPhoneNumber, mPassword, number);
     python::extract<int> getInt(ret);
     if(!getInt.check()) {
         qDebug() << "YSConnection::isValidContact: return value is a not a int";

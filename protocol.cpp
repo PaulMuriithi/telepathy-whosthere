@@ -63,8 +63,8 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
                              QLatin1String("s"), ConnMgrParamFlagRequired)
         << ProtocolParameter(QLatin1String("password"),
                              QLatin1String("s"), ConnMgrParamFlagRequired | ConnMgrParamFlagSecret)
-        << ProtocolParameter(QLatin1String("uid"),
-                             QLatin1String("s"), ConnMgrParamFlagRegister));
+        /*<< ProtocolParameter(QLatin1String("uid"),
+                             QLatin1String("s"), ConnMgrParamFlagRegister)*/);
 
     setRequestableChannelClasses(
             RequestableChannelClassSpecList() << RequestableChannelClassSpec::textChat());
