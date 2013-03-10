@@ -252,6 +252,8 @@ object PythonInterface::call(const QString& method, const T&... args) {
 }
 
 template object PythonInterface::call_intern<QString,QByteArray,QString>(const char* method, const QString&, const QByteArray&, const QString&);
+template object PythonInterface::call_intern<QString,QString,QString,bool>(const char* method, const QString&, const QString&, const QString&, const bool&);
+template object PythonInterface::call_intern<QString,QString,QString,QString>(const char* method, const QString&, const QString&, const QString&, const QString&);
 
 template<typename... T>
 object PythonInterface::call_intern(const char* method, const T&... args) {

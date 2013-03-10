@@ -36,11 +36,15 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
 {
     qDebug() << "YSConnection::YSConnection proto: " << protocolName
              << " parameters: " << parameters;
-    mPhoneNumber = parameters["phonenumber"].toString();
-    mPassword = QByteArray::fromBase64( parameters["password"].toString().toLatin1() );
+    if(parameters.contains("account"))
+        mUsername = parameters["account"].toString();
+    if(parameters.contains("password"))
+        mPassword = QByteArray::fromBase64( parameters["password"].toString().toLatin1() );
+    if(parameters.contains("uid"))
+        mUID = parameters["uid"].toString();
 
 
-    selfHandle = addContact(mPhoneNumber + "@s.whatsapp.net");
+    selfHandle = addContact(mUsername + "@s.whatsapp.net");
     assert(selfHandle == 1);
 
     setCreateChannelCallback( Tp::memFun(this,&YSConnection::createChannel) );
@@ -91,7 +95,7 @@ YSConnection::~YSConnection() {
 
 QString YSConnection::uniqueName() const {
     //May not start with a digit
-    return "u" + mPhoneNumber;
+    return "u" + mUsername;
 }
 
 uint YSConnection::getSelfHandle(Tp::DBusError *error)
@@ -103,8 +107,127 @@ void YSConnection::connect(Tp::DBusError *error) {
     qDebug() << "Thread id connect " << QThread::currentThreadId();
     qDebug() << "YSConnection::connect";
     setStatus(ConnectionStatusConnecting, ConnectionStatusReasonRequested);
-    pythonInterface->call("auth_login", mPhoneNumber, mPassword );
+
+#ifdef USE_CAPTCHA_FOR_REGISTRATION
+    /* Clear pointer from a previous registration */
+    captchaIface.reset();
+#endif
+
+    if(mPassword.length() > 0 ) {
+        pythonInterface->call("auth_login", mUsername, mPassword );
+    } else {
+#ifdef USE_CAPTCHA_FOR_REGISTRATION
+        qDebug() << "Opening registration";
+        if( mUID.length() == 0 ) {
+            qDebug() << "Generating new mUID";
+            mUID = generateUID();
+            //new SetAccountProperties();
+        }
+        //Registration
+        BaseChannelPtr baseChannel = BaseChannel::create(this, TP_QT_IFACE_CHANNEL_TYPE_SERVER_AUTHENTICATION,
+                                                         0, HandleTypeNone, "", false, 0, "");
+
+        BaseChannelServerAuthenticationTypePtr authType
+                = BaseChannelServerAuthenticationType::create(TP_QT_IFACE_CHANNEL_INTERFACE_CAPTCHA_AUTHENTICATION);
+        baseChannel->plugInterface(AbstractChannelInterfacePtr::dynamicCast(authType));
+
+        captchaIface = BaseChannelCaptchaAuthenticationInterface::create(true);
+        captchaIface->setGetCaptchaDataCallback( Tp::memFun(this, &YSConnection::getCaptchaData));
+        captchaIface->setGetCaptchasCallback( Tp::memFun(this, &YSConnection::getCaptchas));
+        captchaIface->setAnswerCaptchasCallback( Tp::memFun(this, &YSConnection::answerCaptchas));
+        captchaIface->setCancelCaptchaCallback( Tp::memFun(this, &YSConnection::cancelCaptcha));
+        baseChannel->plugInterface(AbstractChannelInterfacePtr::dynamicCast(captchaIface));
+
+        baseChannel->registerObject(error);
+        if(!error->isValid())
+            addChannel( baseChannel );
+#else
+        setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonAuthenticationFailed);
+#endif
+    }
 }
+
+#ifdef USE_CAPTCHA_FOR_REGISTRATION
+/* Authentication */
+void YSConnection::getCaptchas(Tp::CaptchaInfoList& captchaInfoList, uint& numberRequired,
+                               QString& language, Tp::DBusError* error)
+{
+    CaptchaInfo captchaInfo;
+    captchaInfo.ID = 0;
+    captchaInfo.type = "qa";
+    captchaInfo.label = "";
+    captchaInfo.flags = CaptchaFlagRequired;
+    captchaInfo.availableMIMETypes = QStringList() << "text/plain";
+    captchaInfoList << captchaInfo;
+
+    numberRequired = 1;
+    language = "en_US";
+}
+
+QByteArray YSConnection::getCaptchaData(uint ID, const QString& mimeType, Tp::DBusError* error)
+{
+    qDebug() << "YSConnection::getCaptchaData " << ID << " " << mimeType;
+    QString countryCode;
+    QString phonenumber;
+    bool useText = true;
+    GILStateHolder gstate;
+    python::object ret = pythonInterface->call_intern("code_request", countryCode, phonenumber, mUID, useText);
+    python::extract<QString> getStr(ret);
+    if(!getStr.check()) {
+        qDebug() << "YSConnection::getCaptchaData: return is not a string";
+        error->set(TP_QT_ERROR_NOT_AVAILABLE,"Could not request code");
+        return QByteArray();
+    }
+    if(getStr() != "send") {
+        qDebug() << "YSConnection::getCaptchaData: status is not send: " << getStr();
+        error->set(TP_QT_ERROR_NOT_AVAILABLE,"Could not request code");
+        return QByteArray();
+    }
+    return QByteArray("Please enter the code you received via text");
+}
+
+void YSConnection::answerCaptchas(const Tp::CaptchaAnswers& answers, Tp::DBusError* error)
+{
+    qDebug() << "YSConnection::answerCaptchas " << answers;
+    if(!answers.contains(0))
+        return;
+    QString code = answers[0];
+    if(code.length() == 7) //remove the hyphon in the middle
+        code = code.left(3) + code.right(3);
+
+    if(!QRegExp("\\d{6}").exactMatch(code)) {
+        qDebug() << "YSConnection::answerCaptchas: code does not have right form " << code;
+    }
+
+    QString countryCode;
+    QString phonenumber;
+    GILStateHolder gstate;
+    python::object ret = pythonInterface->call_intern("code_register", countryCode, phonenumber, mUID, code);
+    python::extract<QString> getStr(ret);
+    if(!getStr.check()) {
+        qDebug() << "YSConnection::answerCaptchas: return is not a string";
+        error->set(TP_QT_ERROR_NOT_AVAILABLE,"Could not request code");
+        return;
+    }
+    if(getStr() != "ok") {
+        qDebug() << "YSConnection::answerCaptchas: status is not ok: " << getStr();
+        captchaIface->setCaptchaError(TP_QT_ERROR_AUTHENTICATION_FAILED);
+        captchaIface->setCaptchaStatus(CaptchaStatusTryAgain);
+        return;
+    }
+    captchaIface->setCaptchaStatus(CaptchaStatusSucceeded);
+    //FIXME: do something with the password
+
+    //connect()
+}
+
+void YSConnection::cancelCaptcha(uint reason, const QString& debugMessage, Tp::DBusError* error)
+{
+    qDebug() << "YSConnection::cancelCaptcha " << reason << " " << debugMessage;
+    captchaIface->setCaptchaStatus(CaptchaStatusFailed);
+    setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonAuthenticationFailed);
+}
+#endif
 
 //This is basically a no-op for the current spec
 bool YSConnection::holdHandles(uint /*handleType*/, const Tp::UIntList& /*handles*/, Tp::DBusError* /*error*/)
@@ -116,9 +239,9 @@ bool YSConnection::holdHandles(uint /*handleType*/, const Tp::UIntList& /*handle
 QStringList YSConnection::inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error)
 {
     qDebug() << "YSConnection::inspectHandles " << handles;
+    QStringList ret;
 
     if( handleType == Tp::HandleTypeContact ) {
-        QStringList ret;
         for( uint handle : handles ) {
             auto i = contacts.left.find(handle);
             if( i == contacts.left.end() ) {
@@ -130,6 +253,15 @@ QStringList YSConnection::inspectHandles(uint handleType, const Tp::UIntList& ha
         }
         return ret;
 
+    } else if(handleType == HandleTypeNone) {
+        for( uint handle : handles ) {
+            if(handle != 0) {
+                error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
+                return QStringList();
+            }
+            ret.append( "" );
+        }
+        return ret;
     } else {
         qDebug() << "YSConnection::inspectHandles: unsupported handle type " << handleType;
         error->set(TP_QT_ERROR_INVALID_ARGUMENT,"Type unknown");
@@ -267,9 +399,10 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
         baseChannel->plugInterface(AbstractChannelInterfacePtr::dynamicCast(messagesIface));
     }
 
+
     baseChannel->registerObject(error);
-    qDebug() << "addChannel";
-    addChannel( baseChannel );
+    if(!error->isValid())
+        addChannel( baseChannel );
 
     return baseChannel;
 }
@@ -496,7 +629,7 @@ bool YSConnection::isValidContact(const QString& identifier) {
 
     GILStateHolder gstate;
     QString number = "+" + identifier.left(identifier.length()-QLatin1String("@s.whatsapp.net").size());
-    python::object ret = pythonInterface->call_intern("syncContact", mPhoneNumber, mPassword, number);
+    python::object ret = pythonInterface->call_intern("syncContact", mUsername, mPassword, number);
     python::extract<int> getInt(ret);
     if(!getInt.check()) {
         qDebug() << "YSConnection::isValidContact: return value is a not a int";
@@ -576,4 +709,15 @@ void YSConnection::setPresenceState(uint handle, const QString& status) {
         presences[handle] = presence;
         simplePresenceIface->setPresences(presences);
     }
+}
+
+QString YSConnection::generateUID()
+{
+    QString randomHex;
+
+    for(int i = 0; i < 32; i++) {
+    int n = qrand() % 16;
+        randomHex.append(QString::number(n,16));
+    }
+    return randomHex;
 }

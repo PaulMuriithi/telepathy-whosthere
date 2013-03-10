@@ -59,10 +59,12 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
     : BaseProtocol(dbusConnection, name)
 {
     setParameters(ProtocolParameterList()
-        << ProtocolParameter(QLatin1String("phonenumber"),
+        << ProtocolParameter(QLatin1String("account"),
                              QLatin1String("s"), ConnMgrParamFlagRequired)
         << ProtocolParameter(QLatin1String("password"),
-                             QLatin1String("s"), ConnMgrParamFlagRequired));
+                             QLatin1String("s"), ConnMgrParamFlagRequired | ConnMgrParamFlagSecret)
+        << ProtocolParameter(QLatin1String("uid"),
+                             QLatin1String("s"), ConnMgrParamFlagRegister));
 
     setRequestableChannelClasses(
             RequestableChannelClassSpecList() << RequestableChannelClassSpec::textChat());
@@ -102,7 +104,12 @@ Protocol::~Protocol()
 
 BaseConnectionPtr Protocol::createConnection(const QVariantMap &parameters, Tp::DBusError *error) {
 
-    return BaseConnection::create<YSConnection>( "whosthere", name().toLatin1(), parameters);
+    if(!parameters.contains("account")) {
+        error->set(TP_QT_ERROR_INVALID_ARGUMENT, QLatin1String("account is missing"));
+        return BaseConnectionPtr();
+    } else {
+        return BaseConnection::create<YSConnection>( "whosthere", name().toLatin1(), parameters);
+    }
 }
 
 QString Protocol::identifyAccount(const QVariantMap &parameters, Tp::DBusError *error)

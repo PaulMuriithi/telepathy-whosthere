@@ -26,6 +26,9 @@
 
 #include "pythoninterface.h"
 
+//There is no client with support for that
+//#define USE_CAPTCHA_FOR_REGISTRATION
+
 class YSConnection : public Tp::BaseConnection
 {
     Q_OBJECT
@@ -61,7 +64,13 @@ public:
     void getContactsByURI(const QStringList& URIs, const QStringList& interfaces,
                          Tp::AddressingNormalizationMap& addressingNormalizationMap,
                          Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error);
-
+#ifdef USE_CAPTCHA_FOR_REGISTRATION
+    /* Authentication */
+    void getCaptchas(Tp::CaptchaInfoList& captchaInfoList, uint& numberRequired, QString& language, Tp::DBusError* error);
+    QByteArray getCaptchaData(uint ID, const QString& mimeType, Tp::DBusError* error);
+    void answerCaptchas(const Tp::CaptchaAnswers& answers, Tp::DBusError* error);
+    void cancelCaptcha(uint reason, const QString& debugMessage, Tp::DBusError* error);
+#endif
 private slots:
     void on_yowsup_auth_success(QString phonenumber);
     void on_yowsup_auth_fail(QString mobilenumber, QString reason);
@@ -80,12 +89,17 @@ private:
     QString getContactByHandle(uint handle);
     void setPresenceState(uint handle, const QString& status);
     void setSubscriptionState(const QString& jid, uint handle, uint state);
+    QString generateUID();
 
     Tp::BaseConnectionRequestsInterfacePtr requestsIface;
     Tp::BaseConnectionContactsInterfacePtr contactsIface;
     Tp::BaseConnectionSimplePresenceInterfacePtr simplePresenceIface;
     Tp::BaseConnectionContactListInterfacePtr contactListIface;
     Tp::BaseConnectionAddressingInterfacePtr addressingIface;
+#ifdef USE_CAPTCHA_FOR_REGISTRATION
+    /* Only valid during registration */
+    Tp::BaseChannelCaptchaAuthenticationInterfacePtr captchaIface;
+#endif
     /* handle "0" is never valid accordin to spec */
     boost::bimap<uint,QString> contacts;
 
@@ -97,7 +111,8 @@ private:
 
     PythonInterface* pythonInterface;
 
-    QString mPhoneNumber;
+    QString mUsername;
     QByteArray mPassword;
+    QString mUID;
     YowsupInterface yowsupInterface;
 };

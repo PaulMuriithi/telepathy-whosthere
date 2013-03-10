@@ -6,6 +6,6 @@ ObjectPath = /org/freedesktop/Telepathy/ConnectionManager/whosthere
 [Protocol whatsapp]
 AddressableVCardFields=tel;
 AddressableURISchemes=tel;
-param-phonenumber = s required
+param-account = s required
 param-password = s required
 param-uid = s

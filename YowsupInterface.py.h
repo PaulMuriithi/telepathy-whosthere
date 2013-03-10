@@ -20,6 +20,8 @@ const char* YowsupInterfacePy =
 R"(
 from Yowsup.connectionmanager import YowsupConnectionManager
 from Yowsup.Contacts.contacts import WAContactsSyncRequest
+from Yowsup.Registration.v2.coderequest import WACodeRequest as WACodeRequestV2
+from Yowsup.Registration.v2.regrequest import WARegRequest as WARegRequestV2
 from Yowsup.Common.debugger import Debugger
 import signal
 #Don't swallow SIGINT
@@ -68,4 +70,19 @@ def syncContact(login, password, contact):
     ret = result[u'c'][0][u'w']
     print "Returning ", ret
     return ret
+
+def code_request(self, countryCode, phoneNumber, identity, useText):
+    print "code_request entered ", countryCode, phoneNumber, identity, "sms" if(useText) else "voice"
+    we = WACodeRequestV2(countryCode, phoneNumber, identity, "sms" if(useText) else "voice")
+    #result = we.send()
+    #print resultToString(result)
+    #return result['status']
+    return u'123'
+
+def code_register(self, countryCode, phoneNumber, identity, code):
+    we = WARegRequestV2(countryCode, phoneNumber, code, identity)
+    #result = we.send()
+    #print resultToString(result)
+    #return result['pw'] if result['pw'] else ''
+    return u'ok'
 )";
