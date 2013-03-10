@@ -125,15 +125,18 @@ GILStateHolder::~GILStateHolder() {
     PyGILState_Release(gstate);
 }
 
-PythonInterface::PythonInterface(YowsupInterface* handler)
+boost::python::object PythonInterface::pModule;
+
+void PythonInterface::initPython()
 {
+    qDebug() << "PythonInterface::initPython";
+    Py_Initialize();
+    PyEval_InitThreads();
+
     boost::python::to_python_converter<QString,QString_to_python_str>();
     boost::python::to_python_converter<QByteArray,QByteArray_to_python_str>();
     QString_from_python_str();
     try {
-        Py_Initialize();
-        PyEval_InitThreads();
-
         pModule = object( (handle<>(borrowed(PyImport_AddModule("__main__")))) );
         object main_namespace = pModule.attr("__dict__");
 
@@ -195,19 +198,28 @@ PythonInterface::PythonInterface(YowsupInterface* handler)
                 D(pong)
                 ;
 #undef D
-
         PyObject* code = Py_CompileString(YowsupInterfacePy,"YowsupInterface.py",Py_file_input);
         PyEval_EvalCode((PyCodeObject*)code,main_namespace.ptr(),main_namespace.ptr());
-        object pFunc = pModule.attr("init");
-
-        pConnectionManager = pFunc(ptr(handler));
-
     } catch(const error_already_set& e) {
         qDebug() << "Python error:";
         PyErr_Print();
         exit(1);
     }
-    tstate = PyEval_SaveThread();
+    PyEval_SaveThread();
+    qDebug() << "PythonInterface::initPython exit";
+}
+
+PythonInterface::PythonInterface(YowsupInterface* handler)
+{
+    GILStateHolder gstate;
+    try {
+        object pFunc = pModule.attr("init");
+        pConnectionManager = pFunc(ptr(handler));
+    } catch(const error_already_set& e) {
+        qDebug() << "Python error:";
+        PyErr_Print();
+        exit(1);
+    }
 }
 
 PythonInterface::~PythonInterface()
@@ -218,8 +230,6 @@ PythonInterface::~PythonInterface()
         readerThread.join();
         qDebug() << "PythonInterface::~PythonInterface: readerThread joined";
     }
-    PyEval_RestoreThread(tstate);
-    //Py_Finalize();//boost::python bug
 }
 
 template object PythonInterface::call<QString,QByteArray>(const QString& method, const QString&, const QByteArray&);

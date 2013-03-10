@@ -96,10 +96,10 @@ public:
     template<typename... T>
     boost::python::object call_intern(const char* method, const T&... args);
     void runReaderThread();
+    static void initPython();
 private:
-    boost::python::object pModule;
+    static boost::python::object pModule;
     boost::python::object pConnectionManager;
-    PyThreadState* tstate;
     std::thread readerThread;
 };
 

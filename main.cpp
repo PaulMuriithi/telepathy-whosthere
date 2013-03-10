@@ -26,6 +26,7 @@
 
 
 #include "protocol.h"
+#include "pythoninterface.h"
 
 using namespace Tp;
 
@@ -45,5 +46,6 @@ int main(int argc, char *argv[])
     cm->addProtocol(proto);
     cm->registerObject();
 
+    PythonInterface::initPython();
     return a.exec();
 }

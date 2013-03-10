@@ -80,17 +80,9 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(addressingIface));
 
     pythonInterface = new PythonInterface(&yowsupInterface);
+
     yowsupInterface.setObjectName("yowsup");
     QMetaObject::connectSlotsByName(this);
-#if 0
-#define D(X) QObject::connect(&yowsupInterface, &YowsupInterface::X, this, &YSConnection::X)
-    D(auth_success);
-    D(auth_fail);
-    D(status_dirty);
-    D(message_received);
-#undef D
-#endif
-    qDebug() << "Thread id constructor " << QThread::currentThreadId();
 }
 
 YSConnection::~YSConnection() {
