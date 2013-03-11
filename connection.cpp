@@ -360,6 +360,7 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
     qDebug() << "YSConnection::createChannel " << channelType
              << " " << targetHandleType
              << " " << targetHandle;
+    Q_ASSERT(error);
     if( targetHandleType != Tp::HandleTypeContact || targetHandle == 0)
     {
         error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
@@ -396,11 +397,6 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
                     });
         baseChannel->plugInterface(AbstractChannelInterfacePtr::dynamicCast(messagesIface));
     }
-
-
-    baseChannel->registerObject(error);
-    if(!error->isValid())
-        addChannel( baseChannel );
 
     return baseChannel;
 }
@@ -518,7 +514,9 @@ void YSConnection::on_yowsup_message_received(QString msgId, QString jid, QStrin
     uint handle = ensureContact(jid);
     Tp::DBusError error;
     bool yours;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT,HandleTypeContact, handle, yours, &error);
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle, yours,
+                                           handle,
+                                           false, &error);
 
     BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
 
@@ -556,7 +554,10 @@ void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
 
     uint handle = ensureContact(jid);
     bool yours;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle, yours, 0);
+    Tp::DBusError error;
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle,
+                                           yours, handle, false,
+                                           &error);
     BaseChannelMessagesInterfacePtr messagesIface = BaseChannelMessagesInterfacePtr::dynamicCast(
                                                     channel->interface(TP_QT_IFACE_CHANNEL_INTERFACE_MESSAGES));
     if(!messagesIface)
@@ -580,7 +581,9 @@ void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId
 
     uint handle = ensureContact(jid);
     bool yours;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle, yours, 0);
+    Tp::DBusError error;
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle,
+                                           yours, handle, false, &error);
     BaseChannelMessagesInterfacePtr messagesIface = BaseChannelMessagesInterfacePtr::dynamicCast(
                                                     channel->interface(TP_QT_IFACE_CHANNEL_INTERFACE_MESSAGES));
     if(!messagesIface)
