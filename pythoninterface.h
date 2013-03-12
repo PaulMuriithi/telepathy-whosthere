@@ -24,12 +24,6 @@
 #include <QString>
 #include <boost/python.hpp>
 
-
-#ifndef PyObject_HEAD
-struct _object;
-typedef _object PyObject;
-#endif
-
 class YowsupInterface : public QObject {
     Q_OBJECT
 public:
