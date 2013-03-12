@@ -1,4 +1,4 @@
-telepathy-whosthere (0.5) UNRELEASED; urgency=low
+telepathy-whosthere (0.5) quantal; urgency=low
 
   * Support for images/videos/contacts/audio/location
 
