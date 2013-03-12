@@ -44,7 +44,7 @@ public:
     void connect(Tp::DBusError *error) override;
     bool holdHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error) override;
     QStringList inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error) override;
-    QString uniqueName() const override;
+    //QString uniqueName() const override;
     Tp::BaseChannelPtr createChannel(const QString& channelType, uint targetHandleType,
                                      uint targetHandle, Tp::DBusError *error);
     Tp::ContactAttributesMap getContactAttributes(const Tp::UIntList& handles,

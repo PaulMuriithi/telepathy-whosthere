@@ -91,10 +91,13 @@ YSConnection::~YSConnection() {
     delete pythonInterface;
 }
 
+/* I wanted one connection per account, but the account manager
+ * does not close failed connections under some circumstances (e.g. failed auth)
 QString YSConnection::uniqueName() const {
     //May not start with a digit
     return "u" + mPhoneNumber;
 }
+*/
 
 uint YSConnection::getSelfHandle(Tp::DBusError *error)
 {
