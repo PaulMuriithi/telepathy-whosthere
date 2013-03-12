@@ -1,3 +1,9 @@
+telepathy-whosthere (0.5) UNRELEASED; urgency=low
+
+  * Support for images/videos/contacts/audio/location
+
+ -- Matthias Gehre <M.Gehre@gmx.de>  Mon, 11 Mar 2013 22:42:06 -0500
+
 telepathy-whosthere (0.4) quantal; urgency=low
 
   * Updated depedencies
