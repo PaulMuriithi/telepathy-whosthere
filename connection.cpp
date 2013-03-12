@@ -505,47 +505,6 @@ void YSConnection::on_yowsup_status_dirty() {
     qDebug() << "YSConnection::status_dirty";
 }
 
-void YSConnection::on_yowsup_message_received(QString msgId, QString jid, QString content, uint timestamp,
-                                    bool wantsReceipt, QString pushName) {
-    qDebug() << "YSConnection::message_received " << msgId <<  " " << jid << " " << content;
-    qDebug() << "Thread id message_received " << QThread::currentThreadId();
-
-    //We cannot wait until messageAcknowledged(), because that indicates that the user saw the message,
-    //not that it was received. Yowsup won't tolerate such long delays.
-    if(wantsReceipt)
-        pythonInterface->call("message_ack", jid, msgId );
-
-    uint handle = ensureContact(jid);
-    Tp::DBusError error;
-    bool yours;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle, yours,
-                                           handle,
-                                           false, &error);
-
-    BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
-
-#if 0
-    uint telepathyMsgId = ++lastMessageId;
-    pendingMessages[QString("%1").arg(telepathyMsgId)] = make_tuple(jid,msgId,wantsReceipt);
-#endif
-    if(!textChannel) {
-        qDebug() << "Error, channel is not a textChannel??";
-        return;
-    }
-    MessagePartList partList;
-    MessagePart header, body;
-    header["message-token"]         = QDBusVariant(msgId);
-    header["message-received"]      = QDBusVariant(timestamp);
-    header["message-sender"]        = QDBusVariant(handle);
-    header["message-sender-id"]     = QDBusVariant(jid);
-    header["sender-nickname"]       = QDBusVariant(pushName);
-    header["message-type"]          = QDBusVariant(ChannelTextMessageTypeNormal);
-    body["content-type"]            = QDBusVariant("text/plain");
-    body["content"]                 = QDBusVariant(content);
-    partList << header << body;
-    textChannel->addReceivedMessage(partList);
-}
-
 void YSConnection::on_yowsup_disconnected(QString reason) {
     qDebug() << "YSConnection::on_yowsup_disconnected: reason=" << reason;
     if(reason == "shutdown") //set in PythonInterface::~PythonInterface()
@@ -626,6 +585,210 @@ void YSConnection::on_yowsup_presence_unavailable(QString jid) {
     if(handle != selfHandle)
         setSubscriptionState(jid, handle, SubscriptionStateYes);
 }
+
+void YSConnection::yowsup_messageReceived(QString msgId, QString jid, const MessagePartList& body, uint timestamp,
+                                          bool wantsReceipt) {
+    //We cannot wait until messageAcknowledged(), because that indicates that the user saw the message,
+    //not that it was received. Yowsup won't tolerate such long delays.
+    if(wantsReceipt)
+        pythonInterface->call("message_ack", jid, msgId );
+
+    uint handle = ensureContact(jid);
+    Tp::DBusError error;
+    bool yours;
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle, yours,
+                                           handle,
+                                           false, &error);
+
+    BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
+
+#if 0
+    uint telepathyMsgId = ++lastMessageId;
+    pendingMessages[QString("%1").arg(telepathyMsgId)] = make_tuple(jid,msgId,wantsReceipt);
+#endif
+    if(!textChannel) {
+        qDebug() << "Error, channel is not a textChannel??";
+        return;
+    }
+    if(timestamp == 0)
+        timestamp = QDateTime::currentMSecsSinceEpoch()/1000;
+    MessagePartList partList;
+    MessagePart header;
+    header["message-token"]         = QDBusVariant(msgId);
+    header["message-received"]      = QDBusVariant(timestamp);
+    header["message-sender"]        = QDBusVariant(handle);
+    header["message-sender-id"]     = QDBusVariant(jid);
+    //header["sender-nickname"]       = QDBusVariant(pushName);
+    header["message-type"]          = QDBusVariant(ChannelTextMessageTypeNormal);
+
+    partList << header << body;
+    textChannel->addReceivedMessage(partList);
+}
+
+void YSConnection::on_yowsup_message_received(QString msgId, QString jid, QString content, uint timestamp,
+                                    bool wantsReceipt, QString pushName) {
+    qDebug() << "YSConnection::message_received " << msgId <<  " " << jid << " " << content;
+
+    MessagePart body;
+    body["content-type"]            = QDBusVariant("text/plain");
+    body["content"]                 = QDBusVariant(content);
+    yowsup_messageReceived(msgId, jid, MessagePartList() << body, timestamp, wantsReceipt);
+}
+
+void YSConnection::yowsup_linked_data_received(const char* type, QString msgId, QString jid, QString preview,
+                                                  QString url, QString size, bool wantsReceipt, const QString& gid) {
+
+    MessagePartList body;
+    MessagePart text;
+    text["content-type"]            = QDBusVariant("text/plain");
+    text["content"]                 = QDBusVariant(QLatin1String(type) + ": " + url + " [" + formatSize(size) + "] ");
+    text["x-whosthere-type"]        = QDBusVariant(type);
+    text["x-whosthere-size"]        = QDBusVariant(size);
+    text["x-whosthere-url"]         = QDBusVariant(url);
+    body << text;
+    if(preview.length() > 0) {
+        MessagePart img;
+        img["content-type"]         = QDBusVariant("image/jpeg");
+        img["content"]              = QDBusVariant(QByteArray::fromBase64(preview.toLatin1()));
+        img["thumbnail"]            = QDBusVariant(true);
+        body << img;
+    }
+    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_image_received(QString msgId, QString jid, QString preview,
+                                            QString url, QString size, bool wantsReceipt) {
+
+    yowsup_linked_data_received("image", msgId, jid, preview, url, size, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_video_received(QString msgId, QString jid, QString preview, QString url, QString size, bool wantsReceipt){
+
+    yowsup_linked_data_received("video", msgId, jid, preview, url, size, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_audio_received(QString msgId,QString jid,QString url,QString size,bool wantsReceipt){
+    yowsup_linked_data_received("audio", msgId, jid, "", url, size, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_location_received(QString msgId,QString jid,QString name,QString preview,QString latitude,QString longitude,bool wantsReceipt){
+
+    QString content;
+    QTextStream stream(&content);
+    stream.setRealNumberNotation(QTextStream::FixedNotation);
+    if(name.length() > 0)
+        stream << "location: \"" << name  << "\" at https://maps.google.com/maps?q=" << latitude << "," << longitude;
+    else
+        stream << "location: https://maps.google.com/maps?q=" << latitude << "," << longitude;
+
+    MessagePartList body;
+    MessagePart text;
+    text["content-type"]            = QDBusVariant("text/plain");
+    text["content"]                 = QDBusVariant(content);
+    text["x-whosthere-type"]        = QDBusVariant("location");
+    text["x-whosthere-name"]        = QDBusVariant(name);
+    text["x-whosthere-latitude"]    = QDBusVariant(latitude);
+    text["x-whosthere-longitude"]   = QDBusVariant(longitude);
+    body << text;
+    MessagePart img;
+    img["content-type"]         = QDBusVariant("image/jpeg");
+    img["content"]              = QDBusVariant(QByteArray::fromBase64(preview.toLatin1()));
+    img["thumbnail"]            = QDBusVariant(true);
+    body << img;
+    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt){
+
+    MessagePartList body;
+    MessagePart text;
+    text["content-type"]            = QDBusVariant("text/plain");
+    text["content"]                 = QDBusVariant(QLatin1String("vcard: ") + data);
+    text["x-whosthere-type"]        = QDBusVariant("vcard");
+    text["x-whosthere-name"]        = QDBusVariant(name);
+    text["x-whosthere-vcard"]       = QDBusVariant(data);
+    body << text;
+    MessagePart vcard;
+    vcard["content-type"]         = QDBusVariant("text/vcard");
+    vcard["content"]              = QDBusVariant(data);
+    body << vcard;
+    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_group_imageReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt){
+    yowsup_linked_data_received("image", msgId, jid, preview, url, size, wantsReceipt, gid);
+}
+
+void YSConnection::on_yowsup_group_videoReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt){
+    yowsup_linked_data_received("video", msgId, jid, preview, url, size, wantsReceipt, gid);
+}
+
+void YSConnection::on_yowsup_group_audioReceived(QString msgId,QString gid,QString jid,QString url, QString size, bool wantsReceipt){
+    yowsup_linked_data_received("audio", msgId, jid, "", url, size, wantsReceipt, gid);
+}
+
+void YSConnection::on_yowsup_group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt){
+    if(wantsReceipt)
+        pythonInterface->call("message_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt){
+    if(wantsReceipt)
+        pythonInterface->call("message_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt){
+    if(wantsReceipt)
+        pythonInterface->call("message_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt){
+    qDebug() << "YSConnection::on_yowsup_notification_contactProfilePictureUpdated";
+    if(wantsReceipt)
+        pythonInterface->call("notification_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt){
+    qDebug() << "YSConnection::on_yowsup_notification_contactProfilePictureRemoved";
+    if(wantsReceipt)
+        pythonInterface->call("notification_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt){
+    qDebug() << "YSConnection::on_yowsup_notification_groupParticipantAdded";
+    if(wantsReceipt)
+        pythonInterface->call("notification_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt){
+    qDebug() << "YSConnection::on_yowsup_notification_groupParticipantRemoved";
+    if(wantsReceipt)
+        pythonInterface->call("notification_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt){
+    qDebug() << "YSConnection::on_yowsup_notification_groupPictureUpdated";
+    if(wantsReceipt)
+        pythonInterface->call("notification_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt){
+    qDebug() << "YSConnection::on_yowsup_notification_groupPictureRemoved";
+    if(wantsReceipt)
+        pythonInterface->call("notification_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_group_subjectReceived(QString msgId,QString jid,QString author,QString newSubject,uint timestamp,bool wantsReceipt) {
+    qDebug() << "YSConnection::on_yowsup_group_subjectReceived";
+    if(wantsReceipt)
+        pythonInterface->call("message_ack", jid, msgId );
+}
+
+void YSConnection::on_yowsup_profile_setStatusSuccess(QString jid, QString msgId) {
+    qDebug() << "YSConnection::on_yowsup_profile_setStatusSuccess";
+    pythonInterface->call("delivered_ack", jid, msgId );
+}
+
 
 /* Convenience */
 bool YSConnection::isValidContact(const QString& identifier) {
@@ -726,4 +889,19 @@ QString YSConnection::generateUID()
         randomHex.append(QString::number(n,16));
     }
     return randomHex;
+}
+
+QString YSConnection::formatSize(QString size_) {
+    uint size = size_.toInt();
+    QString ret;
+    QTextStream stream(&ret);
+    stream.setRealNumberPrecision(1);
+    stream.setRealNumberNotation(QTextStream::FixedNotation);
+    if(size > 1024*1024)
+        stream << (size/1024.0/1024.0) << " MB";
+    else if(size > 103)
+        stream << (size/1024.0) << " KB";
+    else
+        stream << size << " B";
+    return ret;
 }

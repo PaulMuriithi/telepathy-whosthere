@@ -38,17 +38,43 @@ signals:
     void auth_success(QString mobilenumber);
     void auth_fail(QString mobilenumber, QString reason);
     void status_dirty();
+
     void message_received(QString msgId, QString jid, QString content, uint timestamp, bool wantsReceipt, QString pushName);
+    void image_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void video_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void audio_received(QString msgId,QString jid,QString url,QString size,bool wantsReceipt);
+    void location_received(QString msgId,QString jid,QString name,QString preview,QString latitude,QString longitude,bool wantsReceipt);
+    void vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt);
+
+    void group_imageReceived(QString msgId,QString jid,QString author,QString preview,QString url,QString size,bool wantsReceipt);
+    void group_videoReceived(QString msgId,QString jid,QString author,QString preview,QString url,QString size,bool wantsReceipt);
+    void group_audioReceived(QString msgId,QString jid,QString author,QString url, QString size, bool wantsReceipt);
+    void group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt);
+    void group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
+    void group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt);
+
+    void notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
+    void notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
+    void notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt);
+    void notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt);
+    void notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt);
+    void notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt);
+
     void disconnected(QString reason);
     void receipt_messageSent(QString jid,QString msgId);
     void receipt_messageDelivered(QString jid, QString msgId);
     void presence_updated(QString jid, QString lastSeen);
     void presence_available(QString jid);
     void presence_unavailable(QString jid);
-    void group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt);
-    void group_gotInfo(QString jid,QString owner,QString subject,QString subjectOwner,QString subjectT,QString creation);
-    void group_setSubjectSuccess(QString jid);
+
     void group_subjectReceived(QString msgId,QString fromAttribute,QString author,QString newSubject,uint timestamp,bool receiptRequested);
+    void profile_setStatusSuccess(QString jid, QString msgId);
+
+    void group_setSubjectSuccess(QString jid);
+
+    void group_gotInfo(QString jid,QString owner,QString subject,QString subjectOwner,QString subjectT,QString creation);
+
+
     void group_addParticipantsSuccess(QString jid, QString jids);
     void group_removeParticipantsSuccess(QString jid, QString jids);
     void group_createSuccess(QString jid);
@@ -59,7 +85,7 @@ signals:
     void group_gotParticipants(QString jid, QString jids);
     void group_setPictureSuccess(QString jid, QString pictureId);
     void group_setPictureError(QString jid, QString errorCode);
-    void profile_setStatusSuccess(QString jid, QString msgId);
+
     void profile_setPictureSuccess();
     void profile_setPictureError(QString errorCode);
     void receipt_visible(QString jid, QString msgId);
@@ -67,22 +93,6 @@ signals:
     void contact_typing(QString jid);
     void contact_paused(QString jid);
     void contact_gotProfilePicture(QString jid, QString filename);
-    void notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
-    void notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
-    void notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt);
-    void notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt);
-    void notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt);
-    void notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt);
-    void image_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
-    void video_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
-    void audio_received(QString msgId,QString jid,QString url,QString size,bool wantsReceipt);
-    void location_received(QString msgId,QString jid,QString name,QString preview,double latitude,double longitude,bool wantsReceipt);
-    void vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt);
-    void group_imageReceived(QString msgId,QString jid,QString author,QString preview,QString url,uint size,bool wantsReceipt);
-    void group_videoReceived(QString msgId,QString jid,QString author,QString preview,QString url,uint size,bool wantsReceipt);
-    void group_audioReceived(QString msgId,QString jid,QString author,QString url, uint size, bool wantsReceipt);
-    void group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,double latitude, double longitude, bool wantsReceipt);
-    void group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
     void message_error(QString msgId,QString jid,QString errorCode);
     void ping(QString pingId);
     void pong();

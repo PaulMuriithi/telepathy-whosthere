@@ -81,6 +81,34 @@ private slots:
     void on_yowsup_receipt_messageDelivered(QString jid, QString msgId);
     void on_yowsup_presence_available(QString jid);
     void on_yowsup_presence_unavailable(QString jid);
+
+    void on_yowsup_image_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void on_yowsup_video_received(QString msgId,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void on_yowsup_audio_received(QString msgId, QString jid, QString url, QString size, bool wantsReceipt);
+    void on_yowsup_location_received(QString msgId,QString jid,QString name,QString preview,QString latitude,QString longitude,bool wantsReceipt);
+    void on_yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt);
+
+    void on_yowsup_group_imageReceived(QString msgId,QString jid,QString author,QString preview,QString url,QString size,bool wantsReceipt);
+    void on_yowsup_group_videoReceived(QString msgId,QString jid,QString author,QString preview,QString url,QString size,bool wantsReceipt);
+    void on_yowsup_group_audioReceived(QString msgId,QString jid,QString author,QString url, QString size, bool wantsReceipt);
+    void on_yowsup_group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt);
+    void on_yowsup_group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
+    void on_yowsup_group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt);
+
+    void on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
+    void on_yowsup_notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
+    void on_yowsup_notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt);
+    void on_yowsup_notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt);
+    void on_yowsup_notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt);
+    void on_yowsup_notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt);
+
+    void on_yowsup_group_subjectReceived(QString msgId,QString fromAttribute,QString author,QString newSubject,uint timestamp,bool receiptRequested);
+    void on_yowsup_profile_setStatusSuccess(QString jid, QString msgId);
+private:
+    void yowsup_messageReceived(QString msgId, QString jid, const Tp::MessagePartList& body, uint timestamp,
+                                              bool wantsReceipt);
+    void yowsup_linked_data_received(const char* type, QString msgId, QString jid, QString preview,
+                                     QString url,QString size,bool wantsReceipt,const QString& gid = QString());
 private:
     bool isValidContact(const QString& identifier);
     bool isValidId(const QString& jid);
@@ -90,6 +118,7 @@ private:
     void setPresenceState(uint handle, const QString& status);
     void setSubscriptionState(const QString& jid, uint handle, uint state);
     QString generateUID();
+    QString formatSize(QString size_);
 
     Tp::BaseConnectionRequestsInterfacePtr requestsIface;
     Tp::BaseConnectionContactsInterfacePtr contactsIface;
