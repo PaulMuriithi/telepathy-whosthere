@@ -438,7 +438,7 @@ QString YSConnection::sendMessage(const QString& jid, const Tp::MessagePartList&
         }
 
     GILStateHolder gstate;
-    python::object pMsgId = pythonInterface->call("message_send", jid, content);
+    python::object pMsgId = pythonInterface->call("message_send", jid, content.toUtf8());
     python::extract<QString> get_msgId(pMsgId);
     if(!get_msgId.check()) {
         qDebug() << "message_send did not return a string";
