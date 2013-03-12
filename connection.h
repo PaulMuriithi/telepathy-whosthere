@@ -102,6 +102,7 @@ private:
 #endif
     /* handle "0" is never valid accordin to spec */
     boost::bimap<uint,QString> contacts;
+    QHash<uint,uint> contactsSubscription;
 
     /* Mapping the telepathy-id to the yowsup <jid,msgId,wantsReceipt> */
     QHash<QString,std::tuple<QString,QString,bool>> pendingMessages;

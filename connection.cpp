@@ -284,8 +284,8 @@ Tp::ContactAttributesMap YSConnection::getContactAttributes(const Tp::UIntList& 
         //org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i->second;
         if(handle != selfHandle) {
-            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = SubscriptionStateNo;
-            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateNo;
+            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = contactsSubscription[handle];
+            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateYes;
         }
         ret[handle] = attributes;
     }
@@ -301,14 +301,15 @@ Tp::ContactAttributesMap YSConnection::getContactListAttributes(const QStringLis
     Tp::ContactAttributesMap contactAttributeMap;
     for( auto i : contacts.left )
     {
-        if(i.first == selfHandle)
+        uint handle = i.first;
+        if(handle == selfHandle)
             continue;
         QVariantMap attributes;
         //org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i.second;
-        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = SubscriptionStateNo;
-        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateNo;
-        contactAttributeMap[i.first] = attributes;
+        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = contactsSubscription[handle];
+        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateYes;
+        contactAttributeMap[handle] = attributes;
     }
     qDebug() << "YSConnection::getContactListAttributesCallback " << interfaces
              << " = " << contactAttributeMap;
@@ -695,6 +696,7 @@ void YSConnection::setSubscriptionState(const QString& jid, uint handle, uint st
         Tp::HandleIdentifierMap removals;
         contactListIface->contactsChangedWithID(changes, identifiers, removals);
     }
+    contactsSubscription[handle] = state;
 }
 
 void YSConnection::setPresenceState(uint handle, const QString& status) {
