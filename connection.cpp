@@ -633,10 +633,6 @@ void YSConnection::yowsup_messageReceived(QString msgId, QString jid, const Mess
 
     BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
 
-#if 0
-    uint telepathyMsgId = ++lastMessageId;
-    pendingMessages[QString("%1").arg(telepathyMsgId)] = make_tuple(jid,msgId,wantsReceipt);
-#endif
     if(!textChannel) {
         qDebug() << "Error, channel is not a textChannel??";
         return;
