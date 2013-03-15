@@ -327,7 +327,7 @@ void YSConnection::requestSubscription(const Tp::UIntList& contacts,
             return;
         }
         pythonInterface->call("presence_subscribe", jid);
-        setSubscriptionState(jid, handle, SubscriptionStateYes);
+        setSubscriptionState(QStringList() << jid, QList<uint>() << handle, SubscriptionStateYes);
     }
 }
 
@@ -570,9 +570,9 @@ void YSConnection::on_yowsup_presence_available(QString jid) {
         qDebug() << "YSConnection::on_yowsup_presence_available: could not create contact " << jid;
         return;
     }
-    setPresenceState(handle, "available");
+    setPresenceState(QList<uint>() << handle, "available");
     if(handle != selfHandle)
-        setSubscriptionState(jid, handle, SubscriptionStateYes);
+        setSubscriptionState(QStringList() << jid, QList<uint>() << handle, SubscriptionStateYes);
 }
 
 void YSConnection::on_yowsup_presence_unavailable(QString jid) {
@@ -581,9 +581,9 @@ void YSConnection::on_yowsup_presence_unavailable(QString jid) {
         qDebug() << "YSConnection::on_yowsup_presence_unavailable: could not create contact " << jid;
         return;
     }
-    setPresenceState(handle, "offline");
+    setPresenceState(QList<uint>() << handle, "offline");
     if(handle != selfHandle)
-        setSubscriptionState(jid, handle, SubscriptionStateYes);
+        setSubscriptionState(QStringList() << jid, QList<uint>() << handle, SubscriptionStateYes);
 }
 
 void YSConnection::yowsup_messageReceived(QString msgId, QString jid, const MessagePartList& body, uint timestamp,
@@ -829,42 +829,60 @@ QString YSConnection::getContactByHandle(uint handle) {
         return i->second;
 }
 
-uint YSConnection::addContact(QString jid) {
+uint YSConnection::addContact(const QString &jid) {
+
+    return addContacts(QStringList() << jid);
+}
+
+uint YSConnection::addContacts(const QStringList& jids) {
     uint handle = 0;
     for (auto i : contacts.left)
         if( handle < i.first )
             handle = i.first;
-    handle++; // id = maximum + 1, never 0
 
-    contacts.left.insert( make_pair(handle, jid) );
+    QList<uint> handles;
+    foreach(const QString& jid, jids) {
+        handle++; // id = maximum + 1, never 0
+        contacts.left.insert( make_pair(handle, jid) );
+        handles << handle;
+    }
 
-    setPresenceState(handle, "unknown");
-    if(handle != 1 /*selfHandle is not set yet */)
-        setSubscriptionState(jid, handle, SubscriptionStateUnknown);
+    setPresenceState(handles, "unknown");
+    setSubscriptionState(jids, handles, SubscriptionStateUnknown);
 
     return handle;
 }
+void YSConnection::setSubscriptionState(const QStringList& jids, const QList<uint> handles, uint state) {
 
-void YSConnection::setSubscriptionState(const QString& jid, uint handle, uint state) {
-    /* Send ContactList change signal */
-    if(!contactListIface.isNull()) {
+    if(contactListIface.isNull())
+        return;
+
+    Tp::ContactSubscriptionMap changes;
+    Tp::HandleIdentifierMap identifiers;
+
+    for(int i = 0; i < jids.size(); ++i) {
+        /* Send ContactList change signal */
+        if(handles[i] == 1) /*selfHandle is not set yet */
+            continue;
         Tp::ContactSubscriptions change;
         change.publish = SubscriptionStateYes;
         change.publishRequest = "";
         change.subscribe = state;
-        Tp::ContactSubscriptionMap changes;
-        changes[handle] = change;
-        Tp::HandleIdentifierMap identifiers;
-        identifiers[handle] = jid;
-        Tp::HandleIdentifierMap removals;
-        contactListIface->contactsChangedWithID(changes, identifiers, removals);
+        changes[handles[i]] = change;
+        identifiers[handles[i]] = jids[i];
+        contactsSubscription[handles[i]] = state;
     }
-    contactsSubscription[handle] = state;
+    Tp::HandleIdentifierMap removals;
+    contactListIface->contactsChangedWithID(changes, identifiers, removals);
 }
 
-void YSConnection::setPresenceState(uint handle, const QString& status) {
-    if(!simplePresenceIface.isNull()) {
-        SimpleStatusSpecMap statusSpecMap = Protocol::getSimpleStatusSpecMap();
+void YSConnection::setPresenceState(const QList<uint> handles, const QString& status) {
+    if(simplePresenceIface.isNull())
+        return;
+
+    SimpleContactPresences presences;
+    SimpleStatusSpecMap statusSpecMap = Protocol::getSimpleStatusSpecMap();
+    foreach( uint handle, handles) {
         auto i = statusSpecMap.find(status);
         if(i == statusSpecMap.end()) {
             qDebug() << "YSConnection::setPresenceState: status not found: " << status;
@@ -874,10 +892,9 @@ void YSConnection::setPresenceState(uint handle, const QString& status) {
         presence.status = status;
         presence.statusMessage = ""; //FIXME
         presence.type = i->type;
-        SimpleContactPresences presences;
         presences[handle] = presence;
-        simplePresenceIface->setPresences(presences);
     }
+    simplePresenceIface->setPresences(presences);
 }
 
 QString YSConnection::generateUID()

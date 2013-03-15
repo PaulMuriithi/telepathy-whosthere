@@ -112,11 +112,12 @@ private:
 private:
     bool isValidContact(const QString& identifier);
     bool isValidId(const QString& jid);
-    uint addContact(QString jid);
+    uint addContact(const QString& jid);
+    uint addContacts(const QStringList& jid);
     uint ensureContact(QString jid);
     QString getContactByHandle(uint handle);
-    void setPresenceState(uint handle, const QString& status);
-    void setSubscriptionState(const QString& jid, uint handle, uint state);
+    void setPresenceState(const QList<uint> handles, const QString& status);
+    void setSubscriptionState(const QStringList& jid, const QList<uint> handles, uint state);
     QString generateUID();
     QString formatSize(QString size_);
 
