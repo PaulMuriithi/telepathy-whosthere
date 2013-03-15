@@ -549,10 +549,12 @@ void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
     BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle,
                                            yours, handle, false,
                                            &error);
-    BaseChannelMessagesInterfacePtr messagesIface = BaseChannelMessagesInterfacePtr::dynamicCast(
-                                                    channel->interface(TP_QT_IFACE_CHANNEL_INTERFACE_MESSAGES));
-    if(!messagesIface)
+    BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
+
+    if(!textChannel) {
+        qDebug() << "Error, channel is not a textChannel??";
         return;
+    }
 
     MessagePartList partList;
     MessagePart header;
@@ -563,7 +565,7 @@ void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
     header["delivery-token"]        = QDBusVariant(msgId);
     partList << header;
 
-    messagesIface->messageReceived(partList);
+    textChannel->addReceivedMessage(partList);
 }
 
 void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId) {
@@ -575,11 +577,12 @@ void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId
     Tp::DBusError error;
     BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle,
                                            yours, handle, false, &error);
-    BaseChannelMessagesInterfacePtr messagesIface = BaseChannelMessagesInterfacePtr::dynamicCast(
-                                                    channel->interface(TP_QT_IFACE_CHANNEL_INTERFACE_MESSAGES));
-    if(!messagesIface)
-        return;
+    BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
 
+    if(!textChannel) {
+        qDebug() << "Error, channel is not a textChannel??";
+        return;
+    }
     MessagePartList partList;
     MessagePart header;
     header["message-sender"]        = QDBusVariant(handle);
@@ -589,7 +592,7 @@ void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId
     header["delivery-token"]        = QDBusVariant(msgId);
     partList << header;
 
-    messagesIface->messageReceived(partList);
+    textChannel->addReceivedMessage(partList);
 }
 
 void YSConnection::on_yowsup_presence_available(QString jid) {
