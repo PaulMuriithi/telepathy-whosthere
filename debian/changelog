@@ -1,3 +1,10 @@
+telepathy-whosthere (0.6) quantal; urgency=low
+
+  * Support for contacts sync
+  * Bug fixes
+
+ -- Matthias Gehre <M.Gehre@gmx.de>  Thu, 14 Mar 2013 21:17:25 -0500
+
 telepathy-whosthere (0.5) quantal; urgency=low
 
   * Support for images/videos/contacts/audio/location
