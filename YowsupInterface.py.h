@@ -26,7 +26,7 @@ from Yowsup.Common.debugger import Debugger
 import signal
 #Don't swallow SIGINT
 signal.signal(signal.SIGINT, signal.SIG_DFL)
-Debugger.enabled = True
+Debugger.enabled = False
 
 def resultToString(result):
     out = []
