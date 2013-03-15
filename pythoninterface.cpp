@@ -199,6 +199,10 @@ void PythonInterface::initPython()
                 ;
 #undef D
         PyObject* code = Py_CompileString(YowsupInterfacePy,"YowsupInterface.py",Py_file_input);
+        if(!code) {
+            PyErr_Print();
+            exit(1);
+        }
         PyEval_EvalCode((PyCodeObject*)code,main_namespace.ptr(),main_namespace.ptr());
     } catch(const error_already_set& e) {
         qDebug() << "Python error:";
