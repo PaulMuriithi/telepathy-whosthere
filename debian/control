@@ -14,5 +14,5 @@ Homepage: https://github.com/mgehre/telepathy-whosthere
 Package: telepathy-whosthere
 Architecture: any
 Depends: ${shlibs:Depends}, ${misc:Depends}, yowsup (>= 1.0.7)
-Description: A telepathy connection manager for WhatsApp
+Description: Telepathy connection manager for WhatsApp
  telepathy-whosthere is a telepathy connection manager for WhatsApp
