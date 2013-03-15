@@ -71,6 +71,17 @@ def syncContact(login, password, contact):
     print "Returning ", ret
     return ret
 
+def syncContacts(login, password, contacts):
+    wsync = WAContactsSyncRequest(login, password, contacts.split(','))
+    result = wsync.send()
+    print resultToString(result)
+    ret = []
+    for i in result[u'c']:
+        if i[u'w']:
+            ret.append(i[u'n'].encode('utf-8'))
+    print "Returning ", ret
+    return ret
+
 def code_request(self, countryCode, phoneNumber, identity, useText):
     print "code_request entered ", countryCode, phoneNumber, identity, "sms" if(useText) else "voice"
     we = WACodeRequestV2(countryCode, phoneNumber, identity, "sms" if(useText) else "voice")

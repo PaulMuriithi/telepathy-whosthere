@@ -456,11 +456,39 @@ uint YSConnection::setPresence(const QString& status, const QString& message, Tp
     return selfHandle;
 }
 
-void YSConnection::getContactsByVCardField(const QString& field, const QStringList& addresses,const QStringList& interfaces,
-                             Tp::AddressingNormalizationMap& addressingNormalizationMap,
-                             Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error) {
+void YSConnection::getContactsByVCardField(const QString& field, const QStringList& addresses,
+                                           const QStringList& interfaces,
+                                           Tp::AddressingNormalizationMap& addressingNormalizationMap,
+                                           Tp::ContactAttributesMap& contactAttributesMap, Tp::DBusError* error) {
     qDebug() << "YSConnection::getContactsByVCardField " << field << " " << addresses;
 
+    if(field != "tel") {
+        error->set(TP_QT_ERROR_INVALID_ARGUMENT,"Only field 'tel' is supported");
+        return;
+    }
+
+    GILStateHolder gstate;
+    QString numbers = addresses.join(",");
+    python::object ret = pythonInterface->call_intern("syncContacts", mPhoneNumber, mPassword, numbers);
+    python::extract<python::list> getList(ret);
+    if(!getList.check()) {
+        qDebug() << "YSConnection::getContactsByVCardField: return value is not a list";
+        error->set(TP_QT_ERROR_NOT_AVAILABLE,"YSConnection::getContactsByVCardField: return value is not a list");
+        return;
+    }
+    python::list l = getList();
+        while(python::len(l)) {
+        python::object entry = l.pop();
+        python::extract<QString> getNumber(entry);
+        if(!getNumber.check()) {
+            qDebug() << "YSConnection::getContactsByVCardField: return value is not a QString";
+            error->set(TP_QT_ERROR_NOT_AVAILABLE,"YSConnection::getContactsByVCardField: return value is not a QString");
+            return;
+        }
+        qDebug() << "YSConnection::getContactsByVCardField: " << getNumber();
+        QString identifier = getNumber() + "@s.whatsapp.net";
+        addContact(identifier);
+    }
 }
 
 void YSConnection::getContactsByURI(const QStringList& URIs, const QStringList& interfaces,
