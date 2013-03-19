@@ -1,9 +1,14 @@
 cmake_minimum_required(VERSION 2.8.7)
 project(telepathy-whosthere)
 
+find_package(Qt5Core)
+find_package(Qt5DBus)
 
-find_package(Qt5Core REQUIRED)
-find_package(Qt5DBus REQUIRED)
+include_directories(${Qt5Core_INCLUDE_DIRS})
+include_directories(${Qt5DBus_INCLUDE_DIRS})
+add_definitions(${Qt5Core_DEFINITIONS})
+add_definitions(${Qt5DBus_DEFINITIONS})
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${Qt5Core_EXECUTABLE_COMPILE_FLAGS}")
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(PYTHON REQUIRED python)
@@ -32,7 +37,8 @@ include_directories(${TELEPATHY_QT5_INCLUDE_DIR})
 include_directories(${PYTHON_INCLUDE_DIRS})
 
 add_executable(telepathy-whosthere connection.cpp  main.cpp protocol.cpp  pythoninterface.cpp)
-qt5_use_modules(telepathy-whosthere Core DBus)
+#qt5_use_modules(telepathy-whosthere Core DBus)
+target_link_libraries(telepathy-whosthere ${Qt5Core_LIBRARIES} ${Qt5DBus_LIBRARIES})
 target_link_libraries(telepathy-whosthere ${PYTHON_LIBRARIES} ${Boost_LIBRARIES} ${TELEPATHY_QT5_LIBRARIES} ${TELEPATHY_QT5_SERVICE_LIBRARIES})
 install(TARGETS telepathy-whosthere DESTINATION ${DAEMON_DIR})
 
