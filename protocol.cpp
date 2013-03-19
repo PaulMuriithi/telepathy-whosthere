@@ -70,7 +70,7 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
             RequestableChannelClassSpecList() << RequestableChannelClassSpec::textChat());
 
     setEnglishName(QLatin1String("WhatsApp"));
-    setIconName(QLatin1String("example-icon"));
+    setIconName(QLatin1String("whosthere"));
     setVCardField(QLatin1String("tel"));
     //FIXME: setConnectionInterfaces(...);
 
