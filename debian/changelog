@@ -1,6 +1,6 @@
 telepathy-whosthere (0.6ubuntu1) quantal; urgency=low
 
-  * Lower depedencies for backports
+  * Lower dependencies for backports
 
  -- Matthias Gehre <M.Gehre@gmx.de>  Mon, 18 Mar 2013 14:53:35 -0500
 
