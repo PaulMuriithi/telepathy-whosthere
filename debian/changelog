@@ -1,3 +1,9 @@
+telepathy-whosthere (0.7ubuntu1) quantal; urgency=low
+
+  * Fix ppa upload
+
+ -- Matthias Gehre <M.Gehre@gmx.de>  Wed, 20 Mar 2013 18:25:27 -0500
+
 telepathy-whosthere (0.7) quantal; urgency=low
 
   * Lower dependencies for backports
