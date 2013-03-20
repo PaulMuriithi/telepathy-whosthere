@@ -1,7 +1,5 @@
 [ConnectionManager]
 Name = whosthere
-BusName = org.freedesktop.Telepathy.ConnectionManager.whosthere
-ObjectPath = /org/freedesktop/Telepathy/ConnectionManager/whosthere
 
 [Protocol whatsapp]
 AddressableVCardFields=tel;
