@@ -24,6 +24,7 @@
 #include <QString>
 #include <boost/python.hpp>
 
+/* Class which implements all signals emitted by yowsup */
 class YowsupInterface : public QObject {
     Q_OBJECT
 public:
@@ -97,11 +98,17 @@ class PythonInterface
 public:
     PythonInterface(YowsupInterface* handler);
     ~PythonInterface();
+    /* Call a python function on Yowsup's methodInterface */
     template<typename... T>
     boost::python::object call(const QString& method, const T&... args);
+    /* Call a python function in our python wrapper */
     template<typename... T>
     boost::python::object call_intern(const char* method, const T&... args);
+    /* Runs the thread reading from the connection to whatsapp. Signals
+     *  will be dispatched from that thread.
+     */
     void runReaderThread();
+    /* One-time initialization */
     static void initPython();
 private:
     static boost::python::object pModule;
@@ -109,6 +116,7 @@ private:
     std::thread readerThread;
 };
 
+/* Class to hold ensure/release GIL lock */
 class GILStateHolder
 {
 public:

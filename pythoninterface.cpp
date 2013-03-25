@@ -41,6 +41,7 @@ struct QString_to_python_str
       }
 };
 
+/* Converts python string to QString */
 struct QString_from_python_str
 {
     QString_from_python_str()

@@ -46,10 +46,10 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
 
     setCreateChannelCallback( Tp::memFun(this,&YSConnection::createChannel) );
     setRequestHandlesCallback( Tp::memFun(this,&YSConnection::requestHandles) );
-    //Fill requestableChannelClasses
 
+    /* Connection.Interface.Requests */
     requestsIface = BaseConnectionRequestsInterface::create(this);
-    /* TODO: add contact list */
+    /* Fill requestableChannelClasses */
     RequestableChannelClass text;
     text.fixedProperties[TP_QT_IFACE_CHANNEL+".ChannelType"] = TP_QT_IFACE_CHANNEL_TYPE_TEXT;
     text.fixedProperties[TP_QT_IFACE_CHANNEL+".TargetHandleType"]  = HandleTypeContact;
@@ -58,6 +58,7 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     requestsIface->requestableChannelClasses << text;
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(requestsIface));
 
+    /* Connection.Interface.Contacts */
     contactsIface = BaseConnectionContactsInterface::create();
     contactsIface->setGetContactAttributesCallback(Tp::memFun(this,&YSConnection::getContactAttributes));
     contactsIface->setContactAttributeInterfaces(QStringList()
@@ -66,23 +67,25 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
                                                  << TP_QT_IFACE_CONNECTION_INTERFACE_SIMPLE_PRESENCE);
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(contactsIface));
 
+    /* Connection.Interface.SimplePresence */
     simplePresenceIface = BaseConnectionSimplePresenceInterface::create();
     simplePresenceIface->setSetPresenceCallback(Tp::memFun(this,&YSConnection::setPresence));
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(simplePresenceIface));
 
+    /* Connection.Interface.ContactList */
     contactListIface = BaseConnectionContactListInterface::create();
     contactListIface->setGetContactListAttributesCallback(Tp::memFun(this,&YSConnection::getContactListAttributes));
     contactListIface->setRequestSubscriptionCallback(Tp::memFun(this,&YSConnection::requestSubscription));
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(contactListIface));
 
-
+    /* Connection.Interface.Adressing */
     addressingIface = BaseConnectionAddressingInterface::create();
     addressingIface->setGetContactsByVCardFieldCallback( Tp::memFun(this,&YSConnection::getContactsByVCardField) );
     addressingIface->setGetContactsByURICallback( Tp::memFun(this,&YSConnection::getContactsByURI) );
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(addressingIface));
 
+    /* Python interface to yowsup */
     pythonInterface = new PythonInterface(&yowsupInterface);
-
     yowsupInterface.setObjectName("yowsup");
     QMetaObject::connectSlotsByName(this);
 }
@@ -253,7 +256,6 @@ QStringList YSConnection::inspectHandles(uint handleType, const Tp::UIntList& ha
             ret.append( i->second );
         }
         return ret;
-
     } else if(handleType == HandleTypeNone) {
         for( uint handle : handles ) {
             if(handle != 0) {
@@ -407,19 +409,6 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
 
 /* Called when a telepathy client has acknowledged receiving this message */
 void YSConnection::messageAcknowledged(QString /*id*/) {
-#if 0
-    auto i = pendingMessages.find(id);
-    if( i == pendingMessages.end()) {
-        qDebug() << "YSConnection::messageAcknowledged: Warning: id " << id << " not found";
-        return;
-    }
-    QString jid = get<0>(*i);
-    QString msgId = get<1>(*i);
-    bool wantsReceipt = get<2>(*i);
-    qDebug() << "YSConnection::messageAcknowledged: acknowleding " << jid << " " << msgId;
-
-    pendingMessages.erase(i);
-#endif
 }
 
 QString YSConnection::sendMessage(const QString& jid, const Tp::MessagePartList& message, uint /*flags*/,
@@ -456,6 +445,10 @@ uint YSConnection::setPresence(const QString& status, const QString& message, Tp
     return selfHandle;
 }
 
+/*
+ * If field == 'tel', sync's the given contact's phonenumbers with whatsapp to see if they
+ * are registered there.
+ */
 void YSConnection::getContactsByVCardField(const QString& field, const QStringList& addresses,
                                            const QStringList& interfaces,
                                            Tp::AddressingNormalizationMap& addressingNormalizationMap,
@@ -501,7 +494,6 @@ void YSConnection::getContactsByURI(const QStringList& URIs, const QStringList& 
 void YSConnection::on_yowsup_auth_success(QString phonenumber) {
     qDebug() << "YSConnection::auth_success " << phonenumber;
 
-    //FIXME: this crashes in libdbus
     simplePresenceIface->setStatuses(Protocol::getSimpleStatusSpecMap());
     simplePresenceIface->setMaxmimumStatusMessageLength(20); //FIXME
 

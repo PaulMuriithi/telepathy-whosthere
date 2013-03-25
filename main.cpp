@@ -24,7 +24,6 @@
 #include <TelepathyQt/Debug>
 #include <TelepathyQt/Types>
 
-
 #include "protocol.h"
 #include "pythoninterface.h"
 
