@@ -46,7 +46,7 @@ signals:
     void group_audioReceived(QString msgId,QString jid,QString author,QString url, QString size, bool wantsReceipt);
     void group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt);
     void group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
-    void group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt);
+    void group_messageReceived(QString msgId,QString jid,QString author,QString content,int timestamp,bool wantsReceipt, QString pushName);
 
     void notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
     void notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);

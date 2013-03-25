@@ -88,12 +88,12 @@ private slots:
     void on_yowsup_location_received(QString msgId,QString jid,QString name,QString preview,QString latitude,QString longitude,bool wantsReceipt);
     void on_yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt);
 
-    void on_yowsup_group_imageReceived(QString msgId,QString jid,QString author,QString preview,QString url,QString size,bool wantsReceipt);
-    void on_yowsup_group_videoReceived(QString msgId,QString jid,QString author,QString preview,QString url,QString size,bool wantsReceipt);
-    void on_yowsup_group_audioReceived(QString msgId,QString jid,QString author,QString url, QString size, bool wantsReceipt);
-    void on_yowsup_group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt);
-    void on_yowsup_group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
-    void on_yowsup_group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt);
+    void on_yowsup_group_imageReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void on_yowsup_group_videoReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt);
+    void on_yowsup_group_audioReceived(QString msgId,QString gid,QString jid,QString url, QString size, bool wantsReceipt);
+    void on_yowsup_group_locationReceived(QString msgId,QString gid,QString jid,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt);
+    void on_yowsup_group_vcardReceived(QString msgId,QString gid,QString jid,QString name,QString data,bool wantsReceipt);
+    void on_yowsup_group_messageReceived(QString msgId,QString gid,QString jid,QString content, int timestamp, bool wantsReceipt, QString pushName);
 
     void on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
     void on_yowsup_notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
@@ -104,18 +104,32 @@ private slots:
 
     void on_yowsup_group_subjectReceived(QString msgId,QString fromAttribute,QString author,QString newSubject,uint timestamp,bool receiptRequested);
     void on_yowsup_profile_setStatusSuccess(QString jid, QString msgId);
+    void on_yowsup_group_gotInfo(QString gid, QString jid, QString subject, QString subjectOwner, QString subjectT, QString creation);
 private:
     void yowsup_messageReceived(QString msgId, QString jid, const Tp::MessagePartList& body, uint timestamp,
-                                              bool wantsReceipt);
+                                bool wantsReceipt, const QString &gid = QString());
     void yowsup_linked_data_received(const char* type, QString msgId, QString jid, QString preview,
                                      QString url,QString size,bool wantsReceipt,const QString& gid = QString());
+    void yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt, QString gid = QString());
+    void yowsup_location_received(QString msgId, QString jid,
+                                                QString name, QString preview,
+                                                QString latitude, QString longitude,
+                                                bool wantsReceipt, QString gid = QString());
 private:
     bool isValidContact(const QString& identifier);
-    bool isValidId(const QString& jid);
+    bool isContactId(const QString& jid);
+    bool isGroupId(const QString& jid);
+    Tp::HandleType getType(uint handle);
+    Tp::HandleType getType(const QString& id);
+    bool isValidHandle(uint handle);
+    uint getHandle(const QString& id);
+    QString getIdentifier(uint handle);
+    uint ensureHandle(QString id);
+    uint addGroup(const QString& gid);
+    uint ensureGroup(QString gid);
     uint addContact(const QString& jid);
     uint addContacts(const QStringList& jid);
     uint ensureContact(QString jid);
-    QString getContactByHandle(uint handle);
     void setPresenceState(const QList<uint> handles, const QString& status);
     void setSubscriptionState(const QStringList& jid, const QList<uint> handles, uint state);
     QString generateUID();
@@ -130,12 +144,11 @@ private:
     /* Only valid during registration */
     Tp::BaseChannelCaptchaAuthenticationInterfacePtr captchaIface;
 #endif
-    /* handle "0" is never valid accordin to spec */
-    boost::bimap<uint,QString> contacts;
-    QHash<uint,uint> contactsSubscription;
+    /* Maps ids to identifiers. handle "0" is never valid according to spec */
+    boost::bimap<uint,QString> mHandles;
+    /* Maps a contact handle to its subscription state */
+    QHash<uint,uint> mContactsSubscription;
 
-    /* Mapping the telepathy-id to the yowsup <jid,msgId,wantsReceipt> */
-    QHash<QString,std::tuple<QString,QString,bool>> pendingMessages;
     /* increasing id for unique telepathy-ids */
     uint lastMessageId;
     uint selfHandle;

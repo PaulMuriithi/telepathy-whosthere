@@ -67,7 +67,8 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
                              QLatin1String("s"), ConnMgrParamFlagRegister)*/);
 
     setRequestableChannelClasses(
-            RequestableChannelClassSpecList() << RequestableChannelClassSpec::textChat());
+            RequestableChannelClassSpecList() << RequestableChannelClassSpec::textChat()
+                                              << RequestableChannelClassSpec::textChatroom());
 
     setEnglishName(QLatin1String("WhatsApp"));
     setIconName(QLatin1String("whosthere"));

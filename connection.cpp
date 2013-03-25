@@ -55,7 +55,12 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     text.fixedProperties[TP_QT_IFACE_CHANNEL+".TargetHandleType"]  = HandleTypeContact;
     text.allowedProperties.append(TP_QT_IFACE_CHANNEL+".TargetHandle");
     text.allowedProperties.append(TP_QT_IFACE_CHANNEL+".TargetID");
-    requestsIface->requestableChannelClasses << text;
+    RequestableChannelClass textRoom;
+    textRoom.fixedProperties[TP_QT_IFACE_CHANNEL+".ChannelType"] = TP_QT_IFACE_CHANNEL_TYPE_TEXT;
+    textRoom.fixedProperties[TP_QT_IFACE_CHANNEL+".TargetHandleType"]  = HandleTypeRoom;
+    textRoom.allowedProperties.append(TP_QT_IFACE_CHANNEL+".TargetHandle");
+    textRoom.allowedProperties.append(TP_QT_IFACE_CHANNEL+".TargetID");
+    requestsIface->requestableChannelClasses << text << textRoom;
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(requestsIface));
 
     /* Connection.Interface.Contacts */
@@ -245,10 +250,10 @@ QStringList YSConnection::inspectHandles(uint handleType, const Tp::UIntList& ha
     qDebug() << "YSConnection::inspectHandles " << handles;
     QStringList ret;
 
-    if( handleType == Tp::HandleTypeContact ) {
+    if( handleType == Tp::HandleTypeContact || handleType == HandleTypeRoom) {
         for( uint handle : handles ) {
-            auto i = contacts.left.find(handle);
-            if( i == contacts.left.end() ) {
+            auto i = mHandles.left.find(handle);
+            if( i == mHandles.left.end() ) {
                 error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
                 return QStringList();
             }
@@ -278,15 +283,17 @@ Tp::ContactAttributesMap YSConnection::getContactAttributes(const Tp::UIntList& 
 {
     Tp::ContactAttributesMap ret;
     for( uint handle : handles ) {
-        auto i = contacts.left.find(handle);
-        if( i == contacts.left.end())
+        auto i = mHandles.left.find(handle);
+        if( i == mHandles.left.end())
+            continue;
+        if( !isContactId(i->second) )
             continue;
         qDebug() << "getContactAttributes " << handle << " = " << i->second;
         QVariantMap attributes;
         //org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i->second;
         if(handle != selfHandle) {
-            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = contactsSubscription[handle];
+            attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = mContactsSubscription[handle];
             attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateYes;
         }
         ret[handle] = attributes;
@@ -301,15 +308,17 @@ Tp::ContactAttributesMap YSConnection::getContactListAttributes(const QStringLis
                                                                 bool /*hold*/, Tp::DBusError* /*error*/)
 {
     Tp::ContactAttributesMap contactAttributeMap;
-    for( auto i : contacts.left )
+    for( auto i : mHandles.left )
     {
         uint handle = i.first;
         if(handle == selfHandle)
             continue;
+        if( !isContactId(i.second) )
+            continue;
         QVariantMap attributes;
         //org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i.second;
-        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = contactsSubscription[handle];
+        attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = mContactsSubscription[handle];
         attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateYes;
         contactAttributeMap[handle] = attributes;
     }
@@ -323,9 +332,13 @@ void YSConnection::requestSubscription(const Tp::UIntList& contacts,
 {
     qDebug() << "YSConnection::requestSubscription " << contacts;
     for( uint handle : contacts ) {
-        QString jid = getContactByHandle(handle);
+        QString jid = getIdentifier(handle);
         if(jid.length() == 0) {
             error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
+            return;
+        }
+        if(!isContactId(jid)) {
+            error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle is not a ContactHandle");
             return;
         }
         pythonInterface->call("presence_subscribe", jid);
@@ -336,25 +349,36 @@ void YSConnection::requestSubscription(const Tp::UIntList& contacts,
 Tp::UIntList YSConnection::requestHandles(uint handleType, const QStringList& identifiers, Tp::DBusError* error)
 {
     Tp::UIntList ret;
-    if( handleType == Tp::HandleTypeContact ) {
-        for( const QString& identifier : identifiers ) {
-            auto i = contacts.right.find(identifier);
-            if( i == contacts.right.end()) {
-                if(isValidContact(identifier)) {
-                    ret.push_back(addContact(identifier));
-                } else {
-                    qDebug() << "YSConnection::requestHandles: id invalid " << identifier;
-                    error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
-                    return Tp::UIntList();
-                }
-            } else {
-                ret.push_back(i->second);
-            }
-        }
-    } else {
-        qDebug() << "YSConnection::requestHandles: handleType not supported " << handleType;
+
+    if( handleType != Tp::HandleTypeContact && handleType != Tp::HandleTypeRoom ) {
+        qDebug() << "YSConnection::requestHandles: handleType " << handleType << " not supported for ids " << identifiers;
         error->set(TP_QT_ERROR_INVALID_ARGUMENT,"Type unknown");
+        return ret;
     }
+
+    for( const QString& identifier : identifiers ) {
+
+        if(( handleType == Tp::HandleTypeContact && !isContactId(identifier) )
+           ||( handleType == Tp::HandleTypeRoom && !isGroupId(identifier) )) {
+            error->set(TP_QT_ERROR_INVALID_ARGUMENT,"Identifier not valid for that handleType");
+            return ret;
+        }
+
+        auto i = mHandles.right.find(identifier);
+        if( i == mHandles.right.end()) {
+            if(handleType == Tp::HandleTypeContact && isValidContact(identifier)) {
+                //Check if that identifier is at whatsapp
+                ret.push_back(addContact(identifier));
+            } else {
+                qDebug() << "YSConnection::requestHandles: id invalid " << identifier;
+                error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
+                return Tp::UIntList();
+            }
+        } else {
+            ret.push_back(i->second);
+        }
+    }
+
     qDebug() << "YSConnection::requestHandles " << identifiers
              << " = " << ret;
     return ret;
@@ -367,18 +391,25 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
              << " " << targetHandleType
              << " " << targetHandle;
     Q_ASSERT(error);
-    if( targetHandleType != Tp::HandleTypeContact || targetHandle == 0)
+    if( (targetHandleType != Tp::HandleTypeContact && targetHandleType != Tp::HandleTypeRoom)
+            || targetHandle == 0)
     {
         error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
         return BaseChannelPtr();
     }
 
-    auto i = contacts.left.find(targetHandle);
-    if( i == contacts.left.end() ) {
+    auto i = mHandles.left.find(targetHandle);
+    if( i == mHandles.left.end() ) {
         error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
         return BaseChannelPtr();
     }
-    QString jid = i->second;
+    QString id = i->second;
+
+    if( targetHandleType != getType(id) ) {
+        qDebug() << "Type mismatch " << targetHandleType << " " << getType(id);
+        error->set(TP_QT_ERROR_INVALID_ARGUMENT,"handle not valid for that handleType");
+        return BaseChannelPtr();
+    }
 
     BaseChannelPtr baseChannel = BaseChannel::create(this, channelType, targetHandle, targetHandleType);
 
@@ -398,10 +429,19 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
                                                                                              messagePartSupportFlags,
                                                                                              deliveryReportingSupport);
         messagesIface->setSendMessageCallback(
-                    [this, jid] (const Tp::MessagePartList& message, uint flags, Tp::DBusError* error) {
-                        return sendMessage(jid, message, flags, error );
+                    [this, id] (const Tp::MessagePartList& message, uint flags, Tp::DBusError* error) {
+                        return sendMessage(id, message, flags, error );
                     });
         baseChannel->plugInterface(AbstractChannelInterfacePtr::dynamicCast(messagesIface));
+    }
+
+    if(targetHandleType == Tp::HandleTypeRoom) {
+        ChannelGroupFlags flags;
+        flags = flags | ChannelGroupFlagCanAdd | ChannelGroupFlagCanRemove | ChannelGroupFlagProperties;
+        BaseChannelGroupInterfacePtr groupIface = BaseChannelGroupInterface::create(flags, selfHandle);
+        //groupIface->setAddMembersCallback(); FIXME
+        //groupIface->setRemoveMembersCallback();
+        baseChannel->plugInterface( AbstractChannelInterfacePtr::dynamicCast(groupIface) );
     }
 
     return baseChannel;
@@ -533,14 +573,18 @@ void YSConnection::on_yowsup_disconnected(QString reason) {
         setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonNetworkError);
 }
 
-void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
+void YSConnection::on_yowsup_receipt_messageSent(QString id,QString msgId) {
 
-    uint handle = ensureContact(jid);
+    uint handle = ensureHandle(id);
     bool yours;
     Tp::DBusError error;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle,
-                                           yours, handle, false,
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, getType(id), handle,
+                                           yours, selfHandle, false,
                                            &error);
+    if(error.isValid()) {
+        qWarning() << "ensureChannel failed:" << error.name() << " " << error.message();
+        return;
+    }
     BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
 
     if(!textChannel) {
@@ -551,7 +595,7 @@ void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
     MessagePartList partList;
     MessagePart header;
     header["message-sender"]        = QDBusVariant(handle);
-    header["message-sender-id"]     = QDBusVariant(jid);
+    header["message-sender-id"]     = QDBusVariant(id);
     header["message-type"]          = QDBusVariant(ChannelTextMessageTypeDeliveryReport);
     header["delivery-status"]       = QDBusVariant(DeliveryStatusAccepted);
     header["delivery-token"]        = QDBusVariant(msgId);
@@ -560,15 +604,18 @@ void YSConnection::on_yowsup_receipt_messageSent(QString jid,QString msgId) {
     textChannel->addReceivedMessage(partList);
 }
 
-void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId) {
-    //TODO: dispatch to telepathy
-    pythonInterface->call("delivered_ack", jid, msgId);
+void YSConnection::on_yowsup_receipt_messageDelivered(QString id, QString msgId) {
+    pythonInterface->call("delivered_ack", id, msgId);
 
-    uint handle = ensureContact(jid);
+    uint handle = ensureHandle(id);
     bool yours;
     Tp::DBusError error;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle,
-                                           yours, handle, false, &error);
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, getType(id), handle,
+                                           yours, selfHandle, false, &error);
+    if(error.isValid()) {
+        qWarning() << "ensureChannel failed:" << error.name() << " " << error.message();
+        return;
+    }
     BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
 
     if(!textChannel) {
@@ -578,7 +625,7 @@ void YSConnection::on_yowsup_receipt_messageDelivered(QString jid, QString msgId
     MessagePartList partList;
     MessagePart header;
     header["message-sender"]        = QDBusVariant(handle);
-    header["message-sender-id"]     = QDBusVariant(jid);
+    header["message-sender-id"]     = QDBusVariant(id);
     header["message-type"]          = QDBusVariant(ChannelTextMessageTypeDeliveryReport);
     header["delivery-status"]       = QDBusVariant(DeliveryStatusDelivered);
     header["delivery-token"]        = QDBusVariant(msgId);
@@ -610,21 +657,46 @@ void YSConnection::on_yowsup_presence_unavailable(QString jid) {
 }
 
 void YSConnection::yowsup_messageReceived(QString msgId, QString jid, const MessagePartList& body, uint timestamp,
-                                          bool wantsReceipt) {
+                                          bool wantsReceipt, const QString& gid) {
+    qDebug() << "YSConnection::yowsup_messageReceived " << msgId;
     //We cannot wait until messageAcknowledged(), because that indicates that the user saw the message,
     //not that it was received. Yowsup won't tolerate such long delays.
     if(wantsReceipt)
-        pythonInterface->call("message_ack", jid, msgId );
+        pythonInterface->call("message_ack", gid.isEmpty() ? jid : gid, msgId );
 
-    uint handle = ensureContact(jid);
+    uint senderHandle, targetHandle;
+    QString senderId, targetId;
+    HandleType handleType;
+    if(gid.isEmpty()) {
+        senderHandle = targetHandle = ensureContact(jid);
+        senderId = targetId = jid;
+        handleType = HandleTypeContact;
+    } else {
+        senderHandle = ensureContact(jid);
+        senderId = jid;
+        targetHandle = ensureGroup(gid);
+        targetId = gid;
+        handleType = HandleTypeRoom;
+    }
+    //TODO: initiator should be group creator
     Tp::DBusError error;
     bool yours;
-    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, HandleTypeContact, handle, yours,
-                                           handle,
+    BaseChannelPtr channel = ensureChannel(TP_QT_IFACE_CHANNEL_TYPE_TEXT, handleType, targetHandle, yours,
+                                           senderHandle,
                                            false, &error);
+    if(error.isValid()) {
+        qWarning() << "ensureChannel failed:" << error.name() << " " << error.message();
+        return;
+    }
+
+    if(handleType == HandleTypeRoom) {
+        BaseChannelGroupInterfacePtr groupIface = BaseChannelGroupInterfacePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_INTERFACE_GROUP));
+        Q_ASSERT(!groupIface.isNull());
+        groupIface->addMembers(Tp::UIntList() << senderHandle << selfHandle,
+                               QStringList() << senderId << getIdentifier(selfHandle));
+    }
 
     BaseChannelTextTypePtr textChannel = BaseChannelTextTypePtr::dynamicCast(channel->interface(TP_QT_IFACE_CHANNEL_TYPE_TEXT));
-
     if(!textChannel) {
         qDebug() << "Error, channel is not a textChannel??";
         return;
@@ -635,8 +707,8 @@ void YSConnection::yowsup_messageReceived(QString msgId, QString jid, const Mess
     MessagePart header;
     header["message-token"]         = QDBusVariant(msgId);
     header["message-received"]      = QDBusVariant(timestamp);
-    header["message-sender"]        = QDBusVariant(handle);
-    header["message-sender-id"]     = QDBusVariant(jid);
+    header["message-sender"]        = QDBusVariant(senderHandle);
+    header["message-sender-id"]     = QDBusVariant(senderId);
     //header["sender-nickname"]       = QDBusVariant(pushName);
     header["message-type"]          = QDBusVariant(ChannelTextMessageTypeNormal);
 
@@ -652,6 +724,14 @@ void YSConnection::on_yowsup_message_received(QString msgId, QString jid, QStrin
     body["content-type"]            = QDBusVariant("text/plain");
     body["content"]                 = QDBusVariant(content);
     yowsup_messageReceived(msgId, jid, MessagePartList() << body, timestamp, wantsReceipt);
+}
+
+
+void YSConnection::on_yowsup_group_messageReceived(QString msgId,QString gid,QString jid,QString content,int timestamp, bool wantsReceipt, QString pushName) {
+    MessagePart body;
+    body["content-type"]            = QDBusVariant("text/plain");
+    body["content"]                 = QDBusVariant(content);
+    yowsup_messageReceived(msgId, jid, MessagePartList() << body, timestamp, wantsReceipt, gid);
 }
 
 void YSConnection::yowsup_linked_data_received(const char* type, QString msgId, QString jid, QString preview,
@@ -672,7 +752,7 @@ void YSConnection::yowsup_linked_data_received(const char* type, QString msgId, 
         img["thumbnail"]            = QDBusVariant(true);
         body << img;
     }
-    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt);
+    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt, gid);
 }
 
 void YSConnection::on_yowsup_image_received(QString msgId, QString jid, QString preview,
@@ -681,16 +761,31 @@ void YSConnection::on_yowsup_image_received(QString msgId, QString jid, QString 
     yowsup_linked_data_received("image", msgId, jid, preview, url, size, wantsReceipt);
 }
 
+void YSConnection::on_yowsup_group_imageReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt){
+    yowsup_linked_data_received("image", msgId, jid, preview, url, size, wantsReceipt, gid);
+}
+
 void YSConnection::on_yowsup_video_received(QString msgId, QString jid, QString preview, QString url, QString size, bool wantsReceipt){
 
     yowsup_linked_data_received("video", msgId, jid, preview, url, size, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_group_videoReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt){
+    yowsup_linked_data_received("video", msgId, jid, preview, url, size, wantsReceipt, gid);
 }
 
 void YSConnection::on_yowsup_audio_received(QString msgId,QString jid,QString url,QString size,bool wantsReceipt){
     yowsup_linked_data_received("audio", msgId, jid, "", url, size, wantsReceipt);
 }
 
-void YSConnection::on_yowsup_location_received(QString msgId,QString jid,QString name,QString preview,QString latitude,QString longitude,bool wantsReceipt){
+void YSConnection::on_yowsup_group_audioReceived(QString msgId,QString gid,QString jid,QString url, QString size, bool wantsReceipt){
+    yowsup_linked_data_received("audio", msgId, jid, "", url, size, wantsReceipt, gid);
+}
+
+void YSConnection::yowsup_location_received(QString msgId, QString jid,
+                                            QString name, QString preview,
+                                            QString latitude, QString longitude,
+                                            bool wantsReceipt, QString gid) {
 
     QString content;
     QTextStream stream(&content);
@@ -714,10 +809,18 @@ void YSConnection::on_yowsup_location_received(QString msgId,QString jid,QString
     img["content"]              = QDBusVariant(QByteArray::fromBase64(preview.toLatin1()));
     img["thumbnail"]            = QDBusVariant(true);
     body << img;
-    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt);
+    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt, gid);
 }
 
-void YSConnection::on_yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt){
+void YSConnection::on_yowsup_location_received(QString msgId,QString jid,QString name,QString preview,QString latitude,QString longitude,bool wantsReceipt){
+    yowsup_location_received(msgId, jid, name, preview, latitude, longitude, wantsReceipt);
+}
+
+void YSConnection::on_yowsup_group_locationReceived(QString msgId,QString gid,QString jid,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt){
+    yowsup_location_received(msgId, jid, name, preview, latitude, longitude, wantsReceipt, gid);
+}
+
+void YSConnection::yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt, QString gid) {
 
     MessagePartList body;
     MessagePart text;
@@ -731,34 +834,15 @@ void YSConnection::on_yowsup_vcard_received(QString msgId,QString jid,QString na
     vcard["content-type"]         = QDBusVariant("text/vcard");
     vcard["content"]              = QDBusVariant(data);
     body << vcard;
-    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt);
+    yowsup_messageReceived(msgId, jid, body, 0, wantsReceipt, gid);
 }
 
-void YSConnection::on_yowsup_group_imageReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt){
-    yowsup_linked_data_received("image", msgId, jid, preview, url, size, wantsReceipt, gid);
+void YSConnection::on_yowsup_vcard_received(QString msgId,QString jid,QString name, QString data,bool wantsReceipt){
+    yowsup_vcard_received(msgId, jid, name, data, wantsReceipt);
 }
 
-void YSConnection::on_yowsup_group_videoReceived(QString msgId,QString gid,QString jid,QString preview,QString url,QString size,bool wantsReceipt){
-    yowsup_linked_data_received("video", msgId, jid, preview, url, size, wantsReceipt, gid);
-}
-
-void YSConnection::on_yowsup_group_audioReceived(QString msgId,QString gid,QString jid,QString url, QString size, bool wantsReceipt){
-    yowsup_linked_data_received("audio", msgId, jid, "", url, size, wantsReceipt, gid);
-}
-
-void YSConnection::on_yowsup_group_locationReceived(QString msgId,QString jid,QString author,QString name, QString preview,QString latitude, QString longitude, bool wantsReceipt){
-    if(wantsReceipt)
-        pythonInterface->call("message_ack", jid, msgId );
-}
-
-void YSConnection::on_yowsup_group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt){
-    if(wantsReceipt)
-        pythonInterface->call("message_ack", jid, msgId );
-}
-
-void YSConnection::on_yowsup_group_messageReceived(QString msgId,QString jid,QString author,QString content,QString timestamp,bool wantsReceipt){
-    if(wantsReceipt)
-        pythonInterface->call("message_ack", jid, msgId );
+void YSConnection::on_yowsup_group_vcardReceived(QString msgId,QString gid,QString jid,QString name,QString data,bool wantsReceipt){
+    yowsup_vcard_received(msgId, jid, name, data, wantsReceipt, gid);
 }
 
 void YSConnection::on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt){
@@ -773,34 +857,34 @@ void YSConnection::on_yowsup_notification_contactProfilePictureRemoved(QString j
         pythonInterface->call("notification_ack", jid, msgId );
 }
 
-void YSConnection::on_yowsup_notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt){
+void YSConnection::on_yowsup_notification_groupParticipantAdded(QString gid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt){
     qDebug() << "YSConnection::on_yowsup_notification_groupParticipantAdded";
     if(wantsReceipt)
-        pythonInterface->call("notification_ack", jid, msgId );
+        pythonInterface->call("notification_ack", gid, msgId );
 }
 
-void YSConnection::on_yowsup_notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt){
+void YSConnection::on_yowsup_notification_groupParticipantRemoved(QString gid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt){
     qDebug() << "YSConnection::on_yowsup_notification_groupParticipantRemoved";
     if(wantsReceipt)
-        pythonInterface->call("notification_ack", jid, msgId );
+        pythonInterface->call("notification_ack", gid, msgId );
 }
 
-void YSConnection::on_yowsup_notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt){
+void YSConnection::on_yowsup_notification_groupPictureUpdated(QString gid, QString jid, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt){
     qDebug() << "YSConnection::on_yowsup_notification_groupPictureUpdated";
     if(wantsReceipt)
-        pythonInterface->call("notification_ack", jid, msgId );
+        pythonInterface->call("notification_ack", gid, msgId );
 }
 
-void YSConnection::on_yowsup_notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt){
+void YSConnection::on_yowsup_notification_groupPictureRemoved(QString gid, QString jid, uint timestamp, QString msgId, bool wantsReceipt){
     qDebug() << "YSConnection::on_yowsup_notification_groupPictureRemoved";
     if(wantsReceipt)
-        pythonInterface->call("notification_ack", jid, msgId );
+        pythonInterface->call("notification_ack", gid, msgId );
 }
 
-void YSConnection::on_yowsup_group_subjectReceived(QString msgId,QString jid,QString author,QString newSubject,uint timestamp,bool wantsReceipt) {
+void YSConnection::on_yowsup_group_subjectReceived(QString msgId,QString gid,QString jid,QString newSubject,uint timestamp,bool wantsReceipt) {
     qDebug() << "YSConnection::on_yowsup_group_subjectReceived";
     if(wantsReceipt)
-        pythonInterface->call("message_ack", jid, msgId );
+        pythonInterface->call("message_ack", gid, msgId );
 }
 
 void YSConnection::on_yowsup_profile_setStatusSuccess(QString jid, QString msgId) {
@@ -808,10 +892,15 @@ void YSConnection::on_yowsup_profile_setStatusSuccess(QString jid, QString msgId
     pythonInterface->call("delivered_ack", jid, msgId );
 }
 
+void YSConnection::on_yowsup_group_gotInfo(QString gid, QString jid,
+                                           QString subject, QString subjectOwner,
+                                           QString subjectT, QString creation) {
+    qDebug() << "YSConnection::on_yowsup_group_gotInfo";
+}
 
 /* Convenience */
 bool YSConnection::isValidContact(const QString& identifier) {
-    if(!isValidId(identifier))
+    if(!isContactId(identifier))
         return false;
 
     GILStateHolder gstate;
@@ -827,25 +916,109 @@ bool YSConnection::isValidContact(const QString& identifier) {
     return isValid;
 }
 
-bool YSConnection::isValidId(const QString& jid) {
+bool YSConnection::isContactId(const QString& jid) {
     static QRegExp validId(R"(^\d+@s\.whatsapp\.net$)");
     return validId.exactMatch(jid);
 }
 
-uint YSConnection::ensureContact(QString jid) {
-    auto i = contacts.right.find(jid);
-    if( i == contacts.right.end() )
-        return addContact(jid);
+bool YSConnection::isGroupId(const QString& gid) {
+    static QRegExp validId(R"(^\d+-\d+@g\.us$)");
+    return validId.exactMatch(gid);
+}
+
+QString YSConnection::getIdentifier(uint handle) {
+    auto i = mHandles.left.find(handle);
+    if( i == mHandles.left.end() )
+        return "";
     else
         return i->second;
 }
 
-QString YSConnection::getContactByHandle(uint handle) {
-    auto i = contacts.left.find(handle);
-    if( i == contacts.left.end() )
-        return "";
+uint YSConnection::getHandle(const QString& id) {
+    auto i = mHandles.right.find(id);
+    if( i == mHandles.right.end() )
+        return 0;
     else
         return i->second;
+}
+
+bool YSConnection::isValidHandle(uint handle) {
+    return getIdentifier(handle).length() > 0;
+}
+
+HandleType YSConnection::getType(uint handle) {
+    QString id = getIdentifier(handle);
+    if(id.isEmpty())
+        return HandleTypeNone;
+
+    return getType(id);
+}
+
+HandleType YSConnection::getType(const QString& id) {
+    if(isContactId(id))
+        return HandleTypeContact;
+    else if(isGroupId(id))
+        return HandleTypeRoom;
+    else
+        return HandleTypeNone;
+}
+
+uint YSConnection::ensureHandle(QString id) {
+    if(isContactId(id))
+        return ensureContact(id);
+    else if(isGroupId(id))
+        return ensureGroup(id);
+    else {
+        qWarning() << "YSConnection::ensureHandle: invalid id " << id;
+        return 0;
+    }
+}
+
+uint YSConnection::ensureContact(QString jid) {
+    Q_ASSERT(isContactId(jid));
+    uint handle = getHandle(jid);
+    if(!handle)
+        handle = addContact(jid);
+    return handle;
+}
+
+uint YSConnection::ensureGroup(QString gid) {
+    Q_ASSERT(isGroupId(gid));
+    uint handle = getHandle(gid);
+    if(!handle)
+        handle = addGroup(gid);
+    return handle;
+}
+
+uint YSConnection::addGroup(const QString& gid) {
+    uint handle = 0;
+    for (auto i : mHandles.left)
+        if( handle < i.first )
+            handle = i.first;
+
+    handle++; // id = maximum + 1, never 0
+    mHandles.left.insert( make_pair(handle, gid) );
+
+    return handle;
+}
+
+uint YSConnection::addContacts(const QStringList& jids) {
+    uint handle = 0;
+    for (auto i : mHandles.left)
+        if( handle < i.first )
+            handle = i.first;
+
+    QList<uint> newHandles;
+    foreach(const QString& jid, jids) {
+        handle++; // id = maximum + 1, never 0
+        mHandles.left.insert( make_pair(handle, jid) );
+        newHandles << handle;
+    }
+
+    setPresenceState(newHandles, "unknown");
+    setSubscriptionState(jids, newHandles, SubscriptionStateUnknown);
+
+    return handle;
 }
 
 uint YSConnection::addContact(const QString &jid) {
@@ -853,24 +1026,6 @@ uint YSConnection::addContact(const QString &jid) {
     return addContacts(QStringList() << jid);
 }
 
-uint YSConnection::addContacts(const QStringList& jids) {
-    uint handle = 0;
-    for (auto i : contacts.left)
-        if( handle < i.first )
-            handle = i.first;
-
-    QList<uint> handles;
-    foreach(const QString& jid, jids) {
-        handle++; // id = maximum + 1, never 0
-        contacts.left.insert( make_pair(handle, jid) );
-        handles << handle;
-    }
-
-    setPresenceState(handles, "unknown");
-    setSubscriptionState(jids, handles, SubscriptionStateUnknown);
-
-    return handle;
-}
 void YSConnection::setSubscriptionState(const QStringList& jids, const QList<uint> handles, uint state) {
 
     if(contactListIface.isNull())
@@ -889,7 +1044,7 @@ void YSConnection::setSubscriptionState(const QStringList& jids, const QList<uin
         change.subscribe = state;
         changes[handles[i]] = change;
         identifiers[handles[i]] = jids[i];
-        contactsSubscription[handles[i]] = state;
+        mContactsSubscription[handles[i]] = state;
     }
     Tp::HandleIdentifierMap removals;
     contactListIface->contactsChangedWithID(changes, identifiers, removals);
