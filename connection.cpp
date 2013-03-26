@@ -44,6 +44,10 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     selfHandle = addContact(mPhoneNumber + "@s.whatsapp.net");
     assert(selfHandle == 1);
 
+    setSelfHandle(selfHandle);
+
+    setConnectCallback( Tp::memFun(this,&YSConnection::connect) );
+    setInspectHandlesCallback( Tp::memFun(this,&YSConnection::inspectHandles) );
     setCreateChannelCallback( Tp::memFun(this,&YSConnection::createChannel) );
     setRequestHandlesCallback( Tp::memFun(this,&YSConnection::requestHandles) );
 
@@ -106,11 +110,6 @@ QString YSConnection::uniqueName() const {
     return "u" + mPhoneNumber;
 }
 */
-
-uint YSConnection::getSelfHandle(Tp::DBusError *error)
-{
-    return selfHandle;
-}
 
 void YSConnection::connect(Tp::DBusError *error) {
     qDebug() << "Thread id connect " << QThread::currentThreadId();
@@ -237,13 +236,6 @@ void YSConnection::cancelCaptcha(uint reason, const QString& debugMessage, Tp::D
     setStatus(ConnectionStatusDisconnected, ConnectionStatusReasonAuthenticationFailed);
 }
 #endif
-
-//This is basically a no-op for the current spec
-bool YSConnection::holdHandles(uint /*handleType*/, const Tp::UIntList& /*handles*/, Tp::DBusError* /*error*/)
-{
-    //qDebug() << "YSConnection::holdHandles " << handles;
-    return true;
-}
 
 QStringList YSConnection::inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error)
 {

@@ -40,10 +40,8 @@ public:
                     const QString &  	protocolName,
                     const QVariantMap &  	parameters);
     ~YSConnection();
-    uint getSelfHandle(Tp::DBusError *error) override;
-    void connect(Tp::DBusError *error) override;
-    bool holdHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error) override;
-    QStringList inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error) override;
+    void connect(Tp::DBusError *error);
+    QStringList inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error);
     //QString uniqueName() const override;
     Tp::BaseChannelPtr createChannel(const QString& channelType, uint targetHandleType,
                                      uint targetHandle, Tp::DBusError *error);
