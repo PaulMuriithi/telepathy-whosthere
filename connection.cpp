@@ -64,7 +64,10 @@ YSConnection::YSConnection( const QDBusConnection &  	dbusConnection,
     textRoom.fixedProperties[TP_QT_IFACE_CHANNEL+".TargetHandleType"]  = HandleTypeRoom;
     textRoom.allowedProperties.append(TP_QT_IFACE_CHANNEL+".TargetHandle");
     textRoom.allowedProperties.append(TP_QT_IFACE_CHANNEL+".TargetID");
-    requestsIface->requestableChannelClasses << text << textRoom;
+    RequestableChannelClass roomList;
+    roomList.fixedProperties[TP_QT_IFACE_CHANNEL+".ChannelType"] = TP_QT_IFACE_CHANNEL_TYPE_ROOM_LIST;
+    roomList.fixedProperties[TP_QT_IFACE_CHANNEL+".TargetHandleType"]  = HandleTypeNone;
+    requestsIface->requestableChannelClasses << text << textRoom << roomList;
     plugInterface(AbstractConnectionInterfacePtr::dynamicCast(requestsIface));
 
     /* Connection.Interface.Contacts */
@@ -385,9 +388,20 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
              << " " << targetHandleType
              << " " << targetHandle;
     Q_ASSERT(error);
+
+    if(channelType == TP_QT_IFACE_CHANNEL_TYPE_ROOM_LIST) {
+
+        BaseChannelPtr baseChannel = BaseChannel::create(this, channelType, targetHandle, targetHandleType);
+        BaseChannelRoomListTypePtr roomListType = BaseChannelRoomListType::create("");
+        roomListType->setListRoomsCallback( [this, roomListType] (Tp::DBusError* error) {
+                                                        listRooms( roomListType, error) ;
+                                             } );
+        baseChannel->plugInterface(AbstractChannelInterfacePtr::dynamicCast(roomListType));
+        return baseChannel;
+    }
+
     if( (targetHandleType != Tp::HandleTypeContact && targetHandleType != Tp::HandleTypeRoom)
-            || targetHandle == 0)
-    {
+            || targetHandle == 0) {
         error->set(TP_QT_ERROR_INVALID_HANDLE,"Handle not found");
         return BaseChannelPtr();
     }
@@ -548,6 +562,7 @@ void YSConnection::on_yowsup_auth_success(QString phonenumber) {
 
     pythonInterface->runReaderThread();
     pythonInterface->call("presence_sendAvailable");
+    pythonInterface->call("group_getGroups", QString(QLatin1String("participating")) ); //can also be "owning"
 }
 
 void YSConnection::on_yowsup_auth_fail(QString mobilenumber, QString reason) {
@@ -886,10 +901,42 @@ void YSConnection::on_yowsup_profile_setStatusSuccess(QString jid, QString msgId
     pythonInterface->call("delivered_ack", jid, msgId );
 }
 
+/* Group listing */
+void YSConnection::listRooms(BaseChannelRoomListTypePtr roomListType, Tp::DBusError* error) {
+    qDebug() << "YSConnection::listRooms";
+    Tp::RoomInfoList roomInfoList;
+
+    for( Room& room : rooms ) {
+        Tp::RoomInfo roomInfo;
+
+        roomInfo.channelType = TP_QT_IFACE_CHANNEL_TYPE_TEXT;
+        roomInfo.handle = getHandle(room.id);
+        roomInfo.info["handle-name"] = room.id;
+        roomInfo.info["name"] = room.subject;
+        roomInfo.info["subject"] = room.subject;
+        roomInfo.info["members"] = room.members.size();
+        roomInfo.info["password"] = false;
+        roomInfo.info["invite-only"] = false;
+
+        roomInfoList << roomInfo;
+    }
+    roomListType->gotRooms(roomInfoList);
+}
+
 void YSConnection::on_yowsup_group_gotInfo(QString gid, QString jid,
                                            QString subject, QString subjectOwner,
-                                           QString subjectT, QString creation) {
+                                           qlonglong subjectT, qlonglong creation) {
     qDebug() << "YSConnection::on_yowsup_group_gotInfo";
+    Room room;
+    room.id = gid;
+    room.owner = jid;
+    room.subject = subject;
+    room.subjectOwner = subjectOwner;
+    room.creationTimestamp = creation;
+    room.subjectTimestamp = subjectT;
+    //room.members
+    uint roomHandle = ensureHandle(gid);
+    rooms[roomHandle] = room;
 }
 
 /* Convenience */

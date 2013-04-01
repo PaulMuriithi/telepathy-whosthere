@@ -66,6 +66,7 @@ Protocol::Protocol(const QDBusConnection &dbusConnection, const QString &name)
         /*<< ProtocolParameter(QLatin1String("uid"),
                              QLatin1String("s"), ConnMgrParamFlagRegister)*/);
 
+    //FIXME: add RoomList
     setRequestableChannelClasses(
             RequestableChannelClassSpecList() << RequestableChannelClassSpec::textChat()
                                               << RequestableChannelClassSpec::textChatroom());

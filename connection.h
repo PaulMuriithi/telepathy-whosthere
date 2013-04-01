@@ -68,6 +68,7 @@ public:
     void answerCaptchas(const Tp::CaptchaAnswers& answers, Tp::DBusError* error);
     void cancelCaptcha(uint reason, const QString& debugMessage, Tp::DBusError* error);
 #endif
+    void listRooms(Tp::BaseChannelRoomListTypePtr roomListType, Tp::DBusError* error);
 private slots:
     void on_yowsup_auth_success(QString phonenumber);
     void on_yowsup_auth_fail(QString mobilenumber, QString reason);
@@ -101,7 +102,7 @@ private slots:
 
     void on_yowsup_group_subjectReceived(QString msgId,QString fromAttribute,QString author,QString newSubject,uint timestamp,bool receiptRequested);
     void on_yowsup_profile_setStatusSuccess(QString jid, QString msgId);
-    void on_yowsup_group_gotInfo(QString gid, QString jid, QString subject, QString subjectOwner, QString subjectT, QString creation);
+    void on_yowsup_group_gotInfo(QString gid, QString jid, QString subject, QString subjectOwner, qlonglong subjectT, qlonglong creation);
 private:
     void yowsup_messageReceived(QString msgId, QString jid, const Tp::MessagePartList& body, uint timestamp,
                                 bool wantsReceipt, const QString &gid = QString());
@@ -146,6 +147,17 @@ private:
     /* Maps a contact handle to its subscription state */
     QHash<uint,uint> mContactsSubscription;
     Tp::SimpleContactPresences mPresences;
+
+    struct Room {
+        QString id;
+        QString owner;
+        QString subject;
+        QString subjectOwner;
+        qlonglong subjectTimestamp;
+        qlonglong creationTimestamp;
+        QList<uint> members;
+    };
+    QHash<uint,Room> rooms;
 
     /* increasing id for unique telepathy-ids */
     uint lastMessageId;
