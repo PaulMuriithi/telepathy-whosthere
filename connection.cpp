@@ -449,7 +449,29 @@ Tp::BaseChannelPtr YSConnection::createChannel(const QString& channelType, uint 
         BaseChannelGroupInterfacePtr groupIface = BaseChannelGroupInterface::create(flags, selfHandle);
         //groupIface->setAddMembersCallback(); FIXME
         //groupIface->setRemoveMembersCallback();
+        groupIface->addMembers(Tp::UIntList() << selfHandle,
+                               QStringList() << getIdentifier(selfHandle));
         baseChannel->plugInterface( AbstractChannelInterfacePtr::dynamicCast(groupIface) );
+
+        if(rooms.contains(targetHandle)) {
+            const Room& room = rooms[targetHandle];
+            BaseChannelRoomInterfacePtr roomIface = BaseChannelRoomInterface::create(room.subject,
+                                                                                     "",
+                                                                                     room.owner,
+                                                                                     ensureHandle(room.owner),
+                                                                                     room.creationTimestamp);
+            baseChannel->plugInterface( AbstractChannelInterfacePtr::dynamicCast(roomIface) );
+
+            BaseChannelSubjectInterfacePtr subjectIface = BaseChannelSubjectInterface::create();
+            subjectIface->setSubject( room.subject );
+            subjectIface->setActor( room.subjectOwner );
+            subjectIface->setActorHandle( ensureContact(room.subjectOwner) );
+            subjectIface->setTimestamp( room.subjectTimestamp );
+            subjectIface->setCanSet( false );
+            baseChannel->plugInterface( AbstractChannelInterfacePtr::dynamicCast(subjectIface) );
+        } else {
+            qWarning() << "createChannel: room info for handle does not exist: " << targetHandle;
+        }
     }
 
     return baseChannel;
