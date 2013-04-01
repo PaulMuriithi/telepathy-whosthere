@@ -839,7 +839,7 @@ void YSConnection::on_yowsup_group_vcardReceived(QString msgId,QString gid,QStri
     yowsup_vcard_received(msgId, jid, name, data, wantsReceipt, gid);
 }
 
-void YSConnection::on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt){
+void YSConnection::on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,int pictureId, bool wantsReceipt){
     qDebug() << "YSConnection::on_yowsup_notification_contactProfilePictureUpdated";
     if(wantsReceipt)
         pythonInterface->call("notification_ack", jid, msgId );
@@ -863,7 +863,7 @@ void YSConnection::on_yowsup_notification_groupParticipantRemoved(QString gid, Q
         pythonInterface->call("notification_ack", gid, msgId );
 }
 
-void YSConnection::on_yowsup_notification_groupPictureUpdated(QString gid, QString jid, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt){
+void YSConnection::on_yowsup_notification_groupPictureUpdated(QString gid, QString jid, uint timestamp, QString msgId, int pictureId, bool wantsReceipt){
     qDebug() << "YSConnection::on_yowsup_notification_groupPictureUpdated";
     if(wantsReceipt)
         pythonInterface->call("notification_ack", gid, msgId );

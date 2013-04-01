@@ -42,7 +42,6 @@ public:
     ~YSConnection();
     void connect(Tp::DBusError *error);
     QStringList inspectHandles(uint handleType, const Tp::UIntList& handles, Tp::DBusError *error);
-    //QString uniqueName() const override;
     Tp::BaseChannelPtr createChannel(const QString& channelType, uint targetHandleType,
                                      uint targetHandle, Tp::DBusError *error);
     Tp::ContactAttributesMap getContactAttributes(const Tp::UIntList& handles,
@@ -93,11 +92,11 @@ private slots:
     void on_yowsup_group_vcardReceived(QString msgId,QString gid,QString jid,QString name,QString data,bool wantsReceipt);
     void on_yowsup_group_messageReceived(QString msgId,QString gid,QString jid,QString content, int timestamp, bool wantsReceipt, QString pushName);
 
-    void on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
+    void on_yowsup_notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,int pictureId, bool wantsReceipt);
     void on_yowsup_notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
     void on_yowsup_notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt);
     void on_yowsup_notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt);
-    void on_yowsup_notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt);
+    void on_yowsup_notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, int pictureId, bool wantsReceipt);
     void on_yowsup_notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt);
 
     void on_yowsup_group_subjectReceived(QString msgId,QString fromAttribute,QString author,QString newSubject,uint timestamp,bool receiptRequested);

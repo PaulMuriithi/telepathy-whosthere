@@ -48,11 +48,11 @@ signals:
     void group_vcardReceived(QString msgId,QString jid,QString author,QString name,QString data,bool wantsReceipt);
     void group_messageReceived(QString msgId,QString jid,QString author,QString content,int timestamp,bool wantsReceipt, QString pushName);
 
-    void notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId,QString pictureId, bool wantsReceipt);
+    void notification_contactProfilePictureUpdated(QString jid, uint timestamp,QString msgId, int pictureId, bool wantsReceipt);
     void notification_contactProfilePictureRemoved(QString jid, uint timestamp,QString msgId, bool wantsReceipt);
     void notification_groupParticipantAdded(QString gJid, QString jid, QString author, uint timestamp,QString msgId, bool wantsReceipt);
     void notification_groupParticipantRemoved(QString gjid, QString jid, QString author, uint timestamp,QString msgId,bool wantsReceipt);
-    void notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, QString pictureId, bool wantsReceipt);
+    void notification_groupPictureUpdated(QString jid, QString author, uint timestamp, QString msgId, int pictureId, bool wantsReceipt);
     void notification_groupPictureRemoved(QString jid, QString author, uint timestamp, QString msgId, bool wantsReceipt);
 
     void disconnected(QString reason);
@@ -67,24 +67,23 @@ signals:
 
     void group_setSubjectSuccess(QString jid);
 
-    void group_gotInfo(QString jid,QString owner,QString subject,QString subjectOwner,QString subjectT,QString creation);
-
+    void group_gotInfo(QString jid,QString owner,QString subject,QString subjectOwner,qlonglong subjectT,qlonglong creation);
 
     void group_addParticipantsSuccess(QString jid, QString jids);
     void group_removeParticipantsSuccess(QString jid, QString jids);
     void group_createSuccess(QString jid);
     void group_createFail(QString errorCode);
     void group_endSuccess(QString jid);
-    void group_gotPicture(QString jid, QString pictureId, QString filepath);
+    void group_gotPicture(QString jid, int pictureId, QString filepath);
     void group_infoError(QString errorCode);
     void group_gotParticipants(QString jid, QString jids);
-    void group_setPictureSuccess(QString jid, QString pictureId);
+    void group_setPictureSuccess(QString jid, int pictureId);
     void group_setPictureError(QString jid, QString errorCode);
 
     void profile_setPictureSuccess();
     void profile_setPictureError(QString errorCode);
     void receipt_visible(QString jid, QString msgId);
-    void contact_gotProfilePictureId(QString jid, QString pictureId, QString filename);
+    void contact_gotProfilePictureId(QString jid, int pictureId, QString filename);
     void contact_typing(QString jid);
     void contact_paused(QString jid);
     void contact_gotProfilePicture(QString jid, QString filename);
