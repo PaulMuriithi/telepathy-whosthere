@@ -287,6 +287,7 @@ Tp::ContactAttributesMap YSConnection::getContactAttributes(const Tp::UIntList& 
         if(handle != selfHandle) {
             attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = mContactsSubscription[handle];
             attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateYes;
+            attributes["org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence"] = QVariant::fromValue( getPresence(handle) );
         }
         ret[handle] = attributes;
     }
@@ -312,6 +313,7 @@ Tp::ContactAttributesMap YSConnection::getContactListAttributes(const QStringLis
         attributes["org.freedesktop.Telepathy.Connection/contact-id"] = i.second;
         attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/subscribe"] = mContactsSubscription[handle];
         attributes["org.freedesktop.Telepathy.Connection.Interface.ContactList/publish"] = SubscriptionStateYes;
+        attributes["org.freedesktop.Telepathy.Connection.Interface.SimplePresence/presence"] = QVariant::fromValue( getPresence(handle) );
         contactAttributeMap[handle] = attributes;
     }
     qDebug() << "YSConnection::getContactListAttributesCallback " << interfaces
@@ -1042,11 +1044,20 @@ void YSConnection::setSubscriptionState(const QStringList& jids, const QList<uin
     contactListIface->contactsChangedWithID(changes, identifiers, removals);
 }
 
+Tp::SimplePresence YSConnection::getPresence(uint handle) {
+    if( mPresences.contains(handle) )
+        return mPresences[handle];
+    else {
+        qWarning() << "YSConnection::getPresence: no presence for " << handle;
+        return Tp::SimplePresence();
+    }
+}
+
 void YSConnection::setPresenceState(const QList<uint> handles, const QString& status) {
     if(simplePresenceIface.isNull())
         return;
 
-    SimpleContactPresences presences;
+    Tp::SimpleContactPresences newPresences;
     SimpleStatusSpecMap statusSpecMap = Protocol::getSimpleStatusSpecMap();
     foreach( uint handle, handles) {
         auto i = statusSpecMap.find(status);
@@ -1058,9 +1069,11 @@ void YSConnection::setPresenceState(const QList<uint> handles, const QString& st
         presence.status = status;
         presence.statusMessage = ""; //FIXME
         presence.type = i->type;
-        presences[handle] = presence;
+        mPresences[handle] = presence;
+        newPresences[handle] = presence;
+
     }
-    simplePresenceIface->setPresences(presences);
+    simplePresenceIface->setPresences(newPresences);
 }
 
 QString YSConnection::generateUID()

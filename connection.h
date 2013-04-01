@@ -132,7 +132,7 @@ private:
     void setSubscriptionState(const QStringList& jid, const QList<uint> handles, uint state);
     QString generateUID();
     QString formatSize(QString size_);
-
+    Tp::SimplePresence getPresence(uint handle);
     Tp::BaseConnectionRequestsInterfacePtr requestsIface;
     Tp::BaseConnectionContactsInterfacePtr contactsIface;
     Tp::BaseConnectionSimplePresenceInterfacePtr simplePresenceIface;
@@ -146,6 +146,7 @@ private:
     boost::bimap<uint,QString> mHandles;
     /* Maps a contact handle to its subscription state */
     QHash<uint,uint> mContactsSubscription;
+    Tp::SimpleContactPresences mPresences;
 
     /* increasing id for unique telepathy-ids */
     uint lastMessageId;
